@@ -1,3 +1,4 @@
+// TODO: Replace mock authentication with real auth service (Auth0, Clerk, Supabase, etc)
 // Simple mock authentication for prototyping
 // In production, this would use a real auth service
 

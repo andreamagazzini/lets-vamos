@@ -1,3 +1,5 @@
+// TODO: Migrate from IndexedDB to a real database (PostgreSQL/MongoDB/etc)
+// This file contains all IndexedDB operations that need to be replaced with API calls
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
 
 export interface Group {
@@ -64,6 +66,7 @@ interface TrainTogetherDB extends DBSchema {
 
 let dbInstance: IDBPDatabase<TrainTogetherDB> | null = null
 
+// TODO: Replace with API call to backend database
 export async function getDB(): Promise<IDBPDatabase<TrainTogetherDB>> {
   // Check if IndexedDB is available
   if (typeof window === 'undefined') {
@@ -136,6 +139,7 @@ export async function getDB(): Promise<IDBPDatabase<TrainTogetherDB>> {
   }
 }
 
+// TODO: Replace IndexedDB operations with API calls
 // Group operations
 export async function createGroup(group: Group): Promise<void> {
   try {
@@ -159,6 +163,7 @@ export async function getGroupByInviteCode(inviteCode: string): Promise<Group | 
   return groups.find(g => g.inviteCode === inviteCode)
 }
 
+// TODO: Replace IndexedDB operations with API calls
 // Member operations
 export async function createMember(member: Member): Promise<void> {
   const db = await getDB()
@@ -190,6 +195,7 @@ export async function getGroupsByUserEmail(email: string): Promise<Group[]> {
   return groups.filter(g => userMembers.some(m => m.groupId === g.id))
 }
 
+// TODO: Replace IndexedDB operations with API calls
 // Workout operations
 export async function createWorkout(workout: Workout): Promise<void> {
   const db = await getDB()
@@ -223,6 +229,7 @@ export async function getWorkout(workoutId: string): Promise<Workout | undefined
   return db.get('workouts', workoutId)
 }
 
+// TODO: Replace IndexedDB operations with API calls
 // User operations
 export async function createUser(user: User): Promise<void> {
   const db = await getDB()
