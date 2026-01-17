@@ -60,7 +60,11 @@ export default function LogWorkoutModal({
 					laps: "",
 					poolLength: "",
 				}));
-			} else if (state.type === "Run" || state.type === "Bike" || state.type === "Swim") {
+			} else if (
+				state.type === "Run" ||
+				state.type === "Bike" ||
+				state.type === "Swim"
+			) {
 				setState((prev) => ({ ...prev, exercises: [] }));
 			} else {
 				setState((prev) => ({
@@ -194,7 +198,8 @@ export default function LogWorkoutModal({
 		onSave(workoutData);
 	};
 
-	const isCardio = state.type === "Run" || state.type === "Bike" || state.type === "Swim";
+	const isCardio =
+		state.type === "Run" || state.type === "Bike" || state.type === "Swim";
 
 	return (
 		<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -232,7 +237,9 @@ export default function LogWorkoutModal({
 							))}
 						</select>
 						{errors.type && (
-							<p className="mt-2 text-sm text-red-600 font-medium">{errors.type}</p>
+							<p className="mt-2 text-sm text-red-600 font-medium">
+								{errors.type}
+							</p>
 						)}
 					</div>
 
@@ -261,7 +268,9 @@ export default function LogWorkoutModal({
 									updateState({ distancePer100m: value })
 								}
 								onLapsChange={(value) => updateState({ laps: value })}
-								onPoolLengthChange={(value) => updateState({ poolLength: value })}
+								onPoolLengthChange={(value) =>
+									updateState({ poolLength: value })
+								}
 							/>
 
 							<IntervalsSection
@@ -350,7 +359,9 @@ export default function LogWorkoutModal({
 							className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors"
 						/>
 						{errors.date && (
-							<p className="mt-2 text-sm text-red-600 font-medium">{errors.date}</p>
+							<p className="mt-2 text-sm text-red-600 font-medium">
+								{errors.date}
+							</p>
 						)}
 					</div>
 
