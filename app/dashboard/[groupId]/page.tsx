@@ -10,6 +10,7 @@ import WeeklyPlanCard from "@/components/dashboard/WeeklyPlanCard";
 import ProgressChart from "@/components/dashboard/ProgressChart";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import InviteSection from "@/components/dashboard/InviteSection";
+import EditableEmoji from "@/components/dashboard/EditableEmoji";
 
 export default function DashboardPage() {
 	const params = useParams();
@@ -24,6 +25,7 @@ export default function DashboardPage() {
 		loading,
 		handleSaveWorkout: saveWorkout,
 		handleDeleteWorkout,
+		handleUpdateGroup,
 	} = useDashboardData(groupId);
 
 	const handleLogWorkout = () => {
@@ -58,9 +60,16 @@ export default function DashboardPage() {
 				{/* Header */}
 				<div className="mb-8">
 					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-						<h1 className="heading-lg text-black tracking-tight">
-							{group.name}
-						</h1>
+						<div className="flex items-center gap-3">
+							<EditableEmoji
+								emoji={group.emoji || "🏃"}
+								onChange={(emoji) => handleUpdateGroup({ emoji })}
+								size="lg"
+							/>
+							<h1 className="heading-lg text-black tracking-tight">
+								{group.name}
+							</h1>
+						</div>
 						<button
 							onClick={handleLogWorkout}
 							type="button"

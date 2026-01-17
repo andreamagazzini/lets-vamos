@@ -7,6 +7,7 @@ import {
 	createWorkout,
 	updateWorkout,
 	deleteWorkout,
+	updateGroup,
 	type Group,
 	type Member,
 	type Workout,
@@ -86,6 +87,13 @@ export function useDashboardData(groupId: string) {
 		}
 	};
 
+	const handleUpdateGroup = async (updates: Partial<Group>) => {
+		if (!group) return;
+		const updated: Group = { ...group, ...updates };
+		await updateGroup(updated);
+		await loadData();
+	};
+
 	return {
 		group,
 		members,
@@ -94,5 +102,6 @@ export function useDashboardData(groupId: string) {
 		loadData,
 		handleSaveWorkout,
 		handleDeleteWorkout,
+		handleUpdateGroup,
 	};
 }

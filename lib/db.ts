@@ -5,6 +5,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 export interface Group {
   id: string
   name: string
+  emoji?: string
   goalType: string
   goalDate: string
   createdAt: string
@@ -185,6 +186,11 @@ export async function createGroup(group: Group): Promise<void> {
 export async function getGroup(groupId: string): Promise<Group | undefined> {
   const db = await getDB()
   return db.get('groups', groupId)
+}
+
+export async function updateGroup(group: Group): Promise<void> {
+  const db = await getDB()
+  await db.put('groups', group)
 }
 
 export async function getGroupByInviteCode(inviteCode: string): Promise<Group | undefined> {
