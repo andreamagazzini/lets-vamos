@@ -132,34 +132,32 @@ export default function PlannedWorkoutItem({
 	}
 
 	if (settings.displayStyle === "expanded") {
+		const displayText =
+			plannedWorkout.type === "Rest"
+				? "Rest Day"
+				: plannedWorkout.description || plannedWorkout.type;
 		return (
 			<div
 				className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border ${bgColor} ${colors.border} ${textColor}`}
 			>
 				{settings.showIcons && <span className={colors.icon}>{icon}</span>}
-				<span className="text-sm font-medium">
-					{plannedWorkout.description ||
-						plannedWorkout.type === "Rest"
-							? "Rest Day"
-							: plannedWorkout.type}
-				</span>
+				<span className="text-sm font-medium">{displayText}</span>
 			</div>
 		);
 	}
 
 	// detailed style
+	const displayText =
+		plannedWorkout.type === "Rest"
+			? "Rest Day"
+			: plannedWorkout.description || plannedWorkout.type;
 	return (
 		<div
 			className={`inline-flex flex-col gap-1 px-3 py-2 rounded-lg border ${bgColor} ${colors.border} ${textColor}`}
 		>
 			<div className="flex items-center gap-2">
 				{settings.showIcons && <span className={colors.icon}>{icon}</span>}
-				<span className="text-sm font-semibold">
-					{plannedWorkout.description ||
-						plannedWorkout.type === "Rest"
-							? "Rest Day"
-							: plannedWorkout.type}
-				</span>
+				<span className="text-sm font-semibold">{displayText}</span>
 			</div>
 			{settings.showDetails && (
 				<div className="flex items-center gap-3 text-xs opacity-80">
