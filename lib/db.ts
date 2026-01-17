@@ -2,6 +2,14 @@
 // This file contains all IndexedDB operations that need to be replaced with API calls
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
+export interface GroupPlanSettings {
+  displayStyle: 'compact' | 'expanded' | 'detailed'
+  showIcons: boolean
+  showDetails: boolean // Show duration/distance for planned workouts
+  colorTheme: 'default' | 'minimal' | 'vibrant'
+  highlightToday: boolean
+}
+
 export interface Group {
   id: string
   name: string
@@ -11,11 +19,25 @@ export interface Group {
   goalDate: string
   createdAt: string
   inviteCode: string
-  trainingPlan: WeeklyPlan
+  trainingPlan: WeeklyPlan // Default/template plan that repeats
+  weeklyPlanOverrides?: WeeklyPlanOverrides // Optional overrides for specific weeks
+  planSettings?: GroupPlanSettings
+}
+
+export interface PlannedWorkout {
+  type: 'Run' | 'Bike' | 'Swim' | 'Strength' | 'Other' | 'Rest'
+  description?: string // Optional text description
+  duration?: number // minutes
+  distance?: number // km
+  notes?: string
 }
 
 export interface WeeklyPlan {
-  [day: string]: string[] // day: ['5K easy run', 'Rest day']
+  [day: string]: (string | PlannedWorkout)[] // Support both string and structured formats
+}
+
+export interface WeeklyPlanOverrides {
+  [weekKey: string]: WeeklyPlan // weekKey format: "YYYY-MM-DD" (Monday date)
 }
 
 export interface Member {

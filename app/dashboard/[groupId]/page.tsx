@@ -86,7 +86,7 @@ export default function DashboardPage() {
 				<ProgressChart group={group} members={members} workouts={workouts} />
 
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-					<WeeklyPlanCard group={group} />
+					<WeeklyPlanCard group={group} onUpdateGroup={handleUpdateGroup} />
 					<RecentActivity
 						members={members}
 						workouts={workouts}
