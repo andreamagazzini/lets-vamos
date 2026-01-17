@@ -1,6 +1,6 @@
 // TODO: Migrate from IndexedDB to a real database (PostgreSQL/MongoDB/etc)
 // This file contains all IndexedDB operations that need to be replaced with API calls
-import { openDB, DBSchema, IDBPDatabase } from 'idb'
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
 export interface Group {
   id: string
@@ -24,16 +24,46 @@ export interface Member {
   joinedAt: string
 }
 
+export interface Interval {
+  type: 'warmup' | 'work' | 'recovery'
+  distance?: number // km for Run/Bike, per 100m for Swim
+  time?: number // seconds
+  pace?: number // min/km or min/100m
+  avgHeartRate?: number
+}
+
+export interface WorkoutSet {
+  reps?: number
+  weight?: number // kg
+}
+
+export interface Exercise {
+  name: string
+  sets: WorkoutSet[]
+}
+
 export interface Workout {
   id: string
   groupId: string
   memberId: string
   type: string
-  duration?: number
-  distance?: number
+  duration?: number // minutes
+  distance?: number // km for Run/Bike
   notes?: string
   date: string
   createdAt: string
+  // Cardio fields (Run/Bike/Swim)
+  calories?: number
+  avgHeartRate?: number
+  intervals?: Interval[]
+  // Bike-specific
+  avgSpeed?: number // km/h
+  // Swim-specific
+  distancePer100m?: number // seconds per 100m
+  laps?: number
+  poolLength?: number // meters
+  // Strength training
+  exercises?: Exercise[]
 }
 
 export interface User {
