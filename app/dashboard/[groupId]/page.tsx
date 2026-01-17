@@ -79,7 +79,7 @@ export default function DashboardPage() {
 						</button>
 					</div>
 
-					<CountdownCard group={group} />
+					<CountdownCard group={group} onUpdateGroup={handleUpdateGroup} />
 				</div>
 
 				{/* Weekly Plan Progress Chart */}

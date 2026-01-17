@@ -6,6 +6,7 @@ export interface Group {
   id: string
   name: string
   emoji?: string
+  backgroundImage?: string
   goalType: string
   goalDate: string
   createdAt: string
