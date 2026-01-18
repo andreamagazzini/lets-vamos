@@ -88,7 +88,7 @@ export default function IntervalsSection({
             >
               {/* Interval Header */}
               <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm">
                     {index + 1}
                   </span>
@@ -109,11 +109,37 @@ export default function IntervalsSection({
                   >
                     {getTypeLabel(interval.type)}
                   </span>
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor={`interval-${index}-repeats`}
+                      className="text-xs font-semibold text-gray-600 whitespace-nowrap"
+                    >
+                      Repeats:
+                    </label>
+                    <input
+                      id={`interval-${index}-repeats`}
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={interval.repeats || 1}
+                      onChange={(e) =>
+                        onUpdate(
+                          index,
+                          'repeats',
+                          e.target.value === '' || e.target.value === '1'
+                            ? undefined
+                            : parseInt(e.target.value, 10)
+                        )
+                      }
+                      className="w-16 px-2 py-1.5 border-2 border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all bg-white"
+                      placeholder="1"
+                    />
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove(index)}
-                  className="p-2 text-red-500 hover:text-white hover:bg-red-500 rounded-lg transition-all duration-200 hover:shadow-md"
+                  className="p-2 text-red-500 hover:text-white hover:bg-red-500 rounded-lg transition-all duration-200 hover:shadow-md shrink-0"
                   aria-label="Remove interval"
                 >
                   <Trash2 className="w-5 h-5" />

@@ -258,7 +258,7 @@ export default function PlannedWorkoutEditor({
                   expanded={intervalsExpanded}
                   onToggle={() => setIntervalsExpanded(!intervalsExpanded)}
                   onAdd={() => {
-                    setIntervals([...intervals, { type: 'warmup' as const }]);
+                    setIntervals([...intervals, { type: 'warmup' as const, repeats: undefined }]);
                     setIntervalsExpanded(true);
                   }}
                   onRemove={(index) => setIntervals(intervals.filter((_, i) => i !== index))}

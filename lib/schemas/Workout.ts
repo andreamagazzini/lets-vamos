@@ -7,6 +7,7 @@ export const IntervalSchema = z.object({
   pace: z.number().optional(),
   avgHeartRate: z.number().optional(),
   note: z.string().optional(),
+  repeats: z.number().optional(), // number of times to repeat this interval
 });
 
 export const WorkoutSetSchema = z.object({

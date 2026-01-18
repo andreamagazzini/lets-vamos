@@ -222,6 +222,7 @@ export async function GET() {
             pace: { type: 'number' },
             avgHeartRate: { type: 'number' },
             note: { type: 'string' },
+            repeats: { type: 'number', description: 'number of times to repeat this interval' },
           },
         },
         Exercise: {

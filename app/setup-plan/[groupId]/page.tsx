@@ -227,7 +227,7 @@ export default function SetupPlanPage() {
   const handleAddInterval = () => {
     setWorkoutForm((prev) => ({
       ...prev,
-      intervals: [...prev.intervals, { type: 'warmup' as const }],
+      intervals: [...prev.intervals, { type: 'warmup' as const, repeats: undefined }],
     }));
     setIntervalsExpanded(true);
   };
@@ -418,7 +418,59 @@ export default function SetupPlanPage() {
                             workoutText += ` (${workout.duration}min)`;
                           }
                           if (workout.intervals && workout.intervals.length > 0) {
-                            workoutText += ` • ${workout.intervals.length} interval${workout.intervals.length > 1 ? 's' : ''}`;
+                            // Format intervals with repeats
+                            const intervalParts: string[] = [];
+                            const workoutType = workout.type;
+
+                            workout.intervals.forEach((interval, idx) => {
+                              const parts: string[] = [];
+
+                              // For recovery intervals after a repeated work interval, show as ", time break"
+                              if (interval.type === 'recovery' && idx > 0) {
+                                const prevInterval = workout.intervals[idx - 1];
+                                if (prevInterval.repeats && prevInterval.repeats > 1) {
+                                  if (interval.time) {
+                                    const minutes = Math.floor(interval.time / 60);
+                                    const seconds = interval.time % 60;
+                                    if (minutes > 0) {
+                                      intervalParts.push(`, ${minutes}min break`);
+                                    } else {
+                                      intervalParts.push(`, ${interval.time}sec break`);
+                                    }
+                                  } else if (interval.distance) {
+                                    const unit = workoutType === 'Swim' ? 'm' : 'km';
+                                    intervalParts.push(`, ${interval.distance}${unit} break`);
+                                  }
+                                  return; // Skip adding this interval separately
+                                }
+                              }
+
+                              // Add repeats prefix if > 1
+                              if (interval.repeats && interval.repeats > 1) {
+                                parts.push(`${interval.repeats}*`);
+                              }
+
+                              // Add distance
+                              if (interval.distance) {
+                                const unit = workoutType === 'Swim' ? 'm' : 'km';
+                                parts.push(`${interval.distance}${unit}`);
+                              }
+
+                              // Add note
+                              if (interval.note) {
+                                parts.push(interval.note);
+                              }
+
+                              if (parts.length > 0) {
+                                intervalParts.push(parts.join(' '));
+                              }
+                            });
+
+                            if (intervalParts.length > 0) {
+                              workoutText += ` • ${intervalParts.join(' ')}`;
+                            } else {
+                              workoutText += ` • ${workout.intervals.length} interval${workout.intervals.length > 1 ? 's' : ''}`;
+                            }
                           }
                           if (workout.exercises && workout.exercises.length > 0) {
                             workoutText += ` • ${workout.exercises.length} exercise${workout.exercises.length > 1 ? 's' : ''}`;
