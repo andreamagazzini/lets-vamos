@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
     let displayName = '';
 
     try {
-      const clerkUser = await clerkClient.users.getUser(userId);
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(userId);
       const firstName = clerkUser.firstName || '';
       const lastName = clerkUser.lastName || '';
       displayName = [firstName, lastName].filter(Boolean).join(' ').trim();

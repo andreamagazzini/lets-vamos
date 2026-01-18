@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
 
     if (!finalDisplayName) {
       try {
-        const clerkUser = await clerkClient.users.getUser(userId);
+        const client = await clerkClient();
+        const clerkUser = await client.users.getUser(userId);
         const firstName = clerkUser.firstName || '';
         const lastName = clerkUser.lastName || '';
         finalDisplayName = [firstName, lastName].filter(Boolean).join(' ').trim();

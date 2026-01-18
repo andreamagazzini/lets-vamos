@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 import Navbar from '@/components/Navbar';
+import type { Group } from '@/lib/db';
 
 export default function DashboardPage() {
   const router = useRouter();

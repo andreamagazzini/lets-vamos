@@ -59,14 +59,22 @@ export default function AuthModal({
     try {
       if (mode === 'sign-in') {
         // Start sign-in flow with email code
-        const _result = await signIn.create({
+        const result = await signIn.create({
           identifier: email,
         });
 
-        // Prepare email code verification
-        await signIn.prepareFirstFactor({
-          strategy: 'email_code',
-        });
+        // Get the email address ID from the supported first factors
+        const emailFactor = result.supportedFirstFactors?.find(
+          (factor) => factor.strategy === 'email_code'
+        );
+
+        if (emailFactor && 'emailAddressId' in emailFactor) {
+          // Prepare email code verification
+          await signIn.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+        }
 
         setPendingVerification(true);
         toast.info('Check your email for a verification code');
@@ -143,7 +151,9 @@ export default function AuthModal({
             }
           }
 
-          await setActive({ session: result.createdSessionId });
+          if (setActive) {
+            await setActive({ session: result.createdSessionId });
+          }
           toast.success('Account created! Welcome!');
           onClose();
           // Redirect to specified URL or default to create-group
@@ -311,7 +321,16 @@ export default function AuthModal({
                     onClick={async () => {
                       try {
                         if (mode === 'sign-in' && signIn) {
-                          await signIn.prepareFirstFactor({ strategy: 'email_code' });
+                          // Get the email address ID from supported first factors
+                          const emailFactor = signIn.supportedFirstFactors?.find(
+                            (factor) => factor.strategy === 'email_code'
+                          );
+                          if (emailFactor && 'emailAddressId' in emailFactor) {
+                            await signIn.prepareFirstFactor({
+                              strategy: 'email_code',
+                              emailAddressId: emailFactor.emailAddressId,
+                            });
+                          }
                         } else if (mode === 'sign-up' && signUp) {
                           await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
                         }

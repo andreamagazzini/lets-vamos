@@ -105,7 +105,7 @@ export default function Navbar({ currentGroupId }: NavbarProps) {
 
         const currentId = currentGroupIdRef.current;
         if (currentId) {
-          const found = loadedGroups.find((g) => (g._id?.toString() || g._id) === currentId);
+          const found = loadedGroups.find((g: Group) => (g._id?.toString() || g._id) === currentId);
           if (found) {
             setCurrentGroup(found);
           } else {
@@ -121,7 +121,7 @@ export default function Navbar({ currentGroupId }: NavbarProps) {
               // Add it to the groups list if not already there
               if (
                 !loadedGroups.find(
-                  (g) =>
+                  (g: Group) =>
                     (g._id?.toString() || g._id) ===
                     (directGroup._id?.toString() || directGroup._id)
                 )
