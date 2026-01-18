@@ -3,17 +3,12 @@
 import { Plus, RotateCcw, X } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import WeekNavigator from '@/components/dashboard/WeekNavigator';
 import Navbar from '@/components/Navbar';
+import PlanModeSelector from '@/components/plan/PlanModeSelector';
 import { useToast } from '@/components/Toast';
 import WorkoutFields from '@/components/workout-form/WorkoutFields';
 import { DAYS } from '@/lib/constants';
-import {
-  formatWorkoutForCalendar,
-  getWeekKey,
-  getWeekPlan,
-  getWeekRange,
-} from '@/lib/dashboard-utils';
+import { formatWorkoutForCalendar, getWeekKey, getWeekPlan } from '@/lib/dashboard-utils';
 import type { Exercise, Group, Interval, PlannedWorkout, WeeklyPlan } from '@/lib/db';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
@@ -28,6 +23,7 @@ export default function EditPlanPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [currentWeekKey, setCurrentWeekKey] = useState(weekParam || getWeekKey());
   const [useDefaultPlan, setUseDefaultPlan] = useState(true);
+  const [explicitMode, setExplicitMode] = useState<'weekly' | 'week-by-week' | null>(null);
   const [trainingPlan, setTrainingPlan] = useState<WeeklyPlan>({});
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -94,15 +90,35 @@ export default function EditPlanPage() {
 
   useEffect(() => {
     if (group) {
-      // Check if this week has an override
-      const hasOverride = !!group.weeklyPlanOverrides?.[currentWeekKey];
-      setUseDefaultPlan(!hasOverride);
+      // Initialize explicitMode on first load based on whether current week has override
+      if (explicitMode === null) {
+        const hasOverride = !!group.weeklyPlanOverrides?.[currentWeekKey];
+        const initialMode = hasOverride ? 'week-by-week' : 'weekly';
+        setExplicitMode(initialMode);
+        setUseDefaultPlan(!hasOverride);
+        // Load initial plan
+        if (initialMode === 'week-by-week') {
+          const override = group.weeklyPlanOverrides?.[currentWeekKey];
+          setTrainingPlan(override || group.trainingPlan || {});
+        } else {
+          setTrainingPlan(group.trainingPlan || {});
+        }
+        return;
+      }
 
-      // Load the appropriate plan
-      const plan = getWeekPlan(group, currentWeekKey);
-      setTrainingPlan(plan);
+      // When week changes, maintain the current mode and load appropriate plan
+      if (explicitMode === 'week-by-week') {
+        // In week-by-week mode, load the plan for the current week
+        const override = group.weeklyPlanOverrides?.[currentWeekKey];
+        setTrainingPlan(override || group.trainingPlan || {});
+        setUseDefaultPlan(false);
+      } else {
+        // In weekly mode, always use default plan
+        setTrainingPlan(group.trainingPlan || {});
+        setUseDefaultPlan(true);
+      }
     }
-  }, [group, currentWeekKey]);
+  }, [group, currentWeekKey, explicitMode]);
 
   const handleAddWorkout = (day: string) => {
     setEditingDay(day);
@@ -354,22 +370,6 @@ export default function EditPlanPage() {
     }));
   };
 
-  const handleTogglePlanType = () => {
-    if (!group) return;
-
-    const newUseDefault = !useDefaultPlan;
-    setUseDefaultPlan(newUseDefault);
-
-    if (newUseDefault) {
-      // Switch to default plan
-      setTrainingPlan(group.trainingPlan);
-    } else {
-      // Switch to week-specific plan (create from default if no override exists)
-      const override = group.weeklyPlanOverrides?.[currentWeekKey];
-      setTrainingPlan(override || group.trainingPlan);
-    }
-  };
-
   const handleResetToDefault = async () => {
     if (!group) return;
 
@@ -458,7 +458,6 @@ export default function EditPlanPage() {
     );
   }
 
-  const { start } = getWeekRange(currentWeekKey);
   const isUsingOverride = !!group.weeklyPlanOverrides?.[currentWeekKey];
 
   return (
@@ -470,45 +469,39 @@ export default function EditPlanPage() {
             Edit Training Plan
           </h1>
 
-          <WeekNavigator
+          {/* Plan Mode Selector */}
+          <PlanModeSelector
+            mode={explicitMode || (useDefaultPlan ? 'weekly' : 'week-by-week')}
+            onModeChange={(mode) => {
+              setExplicitMode(mode);
+              if (mode === 'weekly') {
+                setUseDefaultPlan(true);
+                setTrainingPlan(group?.trainingPlan || {});
+              } else {
+                setUseDefaultPlan(false);
+                const override = group?.weeklyPlanOverrides?.[currentWeekKey];
+                setTrainingPlan(override || group?.trainingPlan || {});
+              }
+            }}
             currentWeekKey={currentWeekKey}
-            onWeekChange={setCurrentWeekKey}
-            onToday={() => setCurrentWeekKey(getWeekKey())}
+            onWeekChange={(weekKey) => {
+              setCurrentWeekKey(weekKey);
+              // When switching weeks, maintain the current mode and load the appropriate plan
+              if (explicitMode === 'week-by-week' && group) {
+                const override = group.weeklyPlanOverrides?.[weekKey];
+                setTrainingPlan(override || group.trainingPlan || {});
+                setUseDefaultPlan(false);
+              } else if (explicitMode === 'weekly' && group) {
+                setTrainingPlan(group.trainingPlan || {});
+                setUseDefaultPlan(true);
+              }
+            }}
+            showWeekNavigator={true}
           />
 
-          {/* Plan Type Toggle */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="text-sm font-semibold text-gray-700">
-                  {useDefaultPlan ? 'Editing Default Plan' : 'Editing Week-Specific Plan'}
-                </span>
-                <p className="text-xs text-gray-500 mt-1">
-                  {useDefaultPlan
-                    ? 'Changes will apply to all weeks using the default plan'
-                    : `Custom plan for week of ${start.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}`}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleTogglePlanType}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  useDefaultPlan ? 'bg-gray-300' : 'bg-primary'
-                }`}
-                aria-label="Toggle plan type"
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    useDefaultPlan ? 'translate-x-1' : 'translate-x-6'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {!useDefaultPlan && isUsingOverride && (
+          {/* Reset to Default Button - Only show in week-by-week mode when override exists */}
+          {!useDefaultPlan && isUsingOverride && (
+            <div className="mb-6">
               <button
                 type="button"
                 onClick={handleResetToDefault}
@@ -517,8 +510,8 @@ export default function EditPlanPage() {
                 <RotateCcw className="w-4 h-4" />
                 Reset to default plan
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Calendar Grid - Responsive: 2 cols mobile, 4 cols tablet, 7 cols desktop */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-8">

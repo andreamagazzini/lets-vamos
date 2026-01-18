@@ -4,10 +4,11 @@ import { Plus, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import PlanModeSelector, { type PlanMode } from '@/components/plan/PlanModeSelector';
 import { useToast } from '@/components/Toast';
 import WorkoutFields from '@/components/workout-form/WorkoutFields';
 import { DAYS } from '@/lib/constants';
-import { formatWorkoutForCalendar } from '@/lib/dashboard-utils';
+import { formatWorkoutForCalendar, getWeekKey } from '@/lib/dashboard-utils';
 import type { Exercise, Group, Interval, PlannedWorkout, WeeklyPlan } from '@/lib/db';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
@@ -17,6 +18,8 @@ export default function SetupPlanPage() {
   const toast = useToast();
   const groupId = params.groupId as string;
   const [group, setGroup] = useState<Group | null>(null);
+  const [planMode, setPlanMode] = useState<PlanMode>('weekly');
+  const [currentWeekKey, setCurrentWeekKey] = useState(getWeekKey());
   const [trainingPlan, setTrainingPlan] = useState<WeeklyPlan>({});
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -70,6 +73,7 @@ export default function SetupPlanPage() {
     }
 
     setGroup(response.group);
+    // Initialize training plan - will be set based on mode in useEffect
     setTrainingPlan(response.group.trainingPlan || {});
     loadedGroupIdRef.current = groupId;
     setLoading(false);
@@ -82,6 +86,20 @@ export default function SetupPlanPage() {
     // Only run when groupId changes, not when loadGroup changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, loadGroup]);
+
+  // Update training plan when mode or week changes
+  useEffect(() => {
+    if (!group) return;
+
+    if (planMode === 'weekly') {
+      setTrainingPlan(group.trainingPlan || {});
+    } else {
+      // In week-by-week mode, load the plan for the current week
+      const weekPlan =
+        group.weeklyPlanOverrides?.[currentWeekKey] || group.trainingPlan || {};
+      setTrainingPlan(weekPlan);
+    }
+  }, [group, planMode, currentWeekKey]);
 
   const handleAddWorkout = (day: string) => {
     setEditingDay(day);
@@ -234,17 +252,38 @@ export default function SetupPlanPage() {
     if (!group || !group._id) return;
 
     const { error } = await handleAsync(async () => {
-      const res = await fetch('/api/groups', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupId: group._id?.toString() || group._id,
-          trainingPlan,
-        }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to update group');
+      if (planMode === 'weekly') {
+        // Save to default trainingPlan
+        const res = await fetch('/api/groups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            groupId: group._id?.toString() || group._id,
+            trainingPlan,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update group');
+        }
+      } else {
+        // Save to weeklyPlanOverrides for the current week
+        const newOverrides = {
+          ...(group.weeklyPlanOverrides || {}),
+          [currentWeekKey]: trainingPlan,
+        };
+        const res = await fetch('/api/groups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            groupId: group._id?.toString() || group._id,
+            weeklyPlanOverrides: newOverrides,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update group');
+        }
       }
     }, 'handleDone');
 
@@ -286,9 +325,38 @@ export default function SetupPlanPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Set Up Your Weekly Training Plan
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
-            Add workouts for each day of the week. This plan will repeat weekly.
-          </p>
+
+          {/* Plan Mode Selector */}
+          <PlanModeSelector
+            mode={planMode}
+            onModeChange={(mode) => {
+              setPlanMode(mode);
+              // When switching modes, update the training plan
+              if (mode === 'weekly') {
+                // Switch to default plan
+                setTrainingPlan(group?.trainingPlan || {});
+              } else {
+                // Switch to week-by-week, load plan for current week
+                if (!currentWeekKey) {
+                  setCurrentWeekKey(getWeekKey());
+                }
+                const weekPlan =
+                  group?.weeklyPlanOverrides?.[currentWeekKey] || group?.trainingPlan || {};
+                setTrainingPlan(weekPlan);
+              }
+            }}
+            currentWeekKey={currentWeekKey}
+            onWeekChange={(weekKey) => {
+              setCurrentWeekKey(weekKey);
+              // Load the plan for the new week
+              if (planMode === 'week-by-week' && group) {
+                const weekPlan =
+                  group.weeklyPlanOverrides?.[weekKey] || group.trainingPlan || {};
+                setTrainingPlan(weekPlan);
+              }
+            }}
+            showWeekNavigator={true}
+          />
 
           {/* Calendar Grid - Responsive: 2 cols mobile, 4 cols tablet, 7 cols desktop */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-8">
