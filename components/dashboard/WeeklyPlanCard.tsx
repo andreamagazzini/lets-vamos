@@ -248,18 +248,24 @@ export default function WeeklyPlanCard({
             return (
               <div
                 key={day}
-                className={`p-3 md:p-4 rounded-xl transition-all bg-gray-50 border-2 ${
-                  isTodayDay ? 'border-primary' : 'border-gray-100 hover:border-primary/20'
+                className={`p-2.5 md:p-3 rounded-lg transition-colors ${
+                  isTodayDay
+                    ? 'bg-primary/5 border border-primary'
+                    : 'bg-white border border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <div className="font-bold text-xs md:text-sm mb-2 tracking-wide text-center md:text-left">
+                <div
+                  className={`font-semibold text-xs mb-2 tracking-tight text-center md:text-left uppercase ${
+                    isTodayDay ? 'text-primary' : 'text-gray-600'
+                  }`}
+                >
                   {day}
                 </div>
                 {mergedWorkouts.length > 0 || restDays.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {/* All workouts - full width */}
                     {mergedWorkouts.length > 0 && (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {mergedWorkouts.map((item) => {
                           const workoutKey = `merged-${day}-${item.type}`;
                           const workoutToDisplay = item.planned || { type: item.type };
@@ -273,7 +279,7 @@ export default function WeeklyPlanCard({
                                 setSelectedType(item.type);
                                 setSelectedPlannedWorkout(item.planned);
                               }}
-                              className="w-full focus:outline-none"
+                              className="w-full focus:outline-none focus:ring-1 focus:ring-primary/30 rounded"
                             >
                               <PlannedWorkoutItem
                                 workout={workoutToDisplay}
@@ -289,7 +295,7 @@ export default function WeeklyPlanCard({
 
                     {/* Rest days (shown separately) */}
                     {restDays.length > 0 && (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {restDays.map((restDay, i) => {
                           const workoutKey = `rest-${day}-${i}`;
                           return (
@@ -301,7 +307,7 @@ export default function WeeklyPlanCard({
                                 setSelectedType('Rest');
                                 setSelectedPlannedWorkout(restDay);
                               }}
-                              className="w-full focus:outline-none"
+                              className="w-full focus:outline-none focus:ring-1 focus:ring-primary/30 rounded"
                             >
                               <PlannedWorkoutItem
                                 workout={restDay}
@@ -316,7 +322,7 @@ export default function WeeklyPlanCard({
                     )}
                   </div>
                 ) : (
-                  <div className="body-sm text-gray-400 text-center md:text-left text-xs md:text-sm">
+                  <div className="text-xs text-gray-400 text-center md:text-left py-1">
                     No workouts planned
                   </div>
                 )}
@@ -367,11 +373,15 @@ export default function WeeklyPlanCard({
               </button>
             </div>
             {(() => {
-              const dayIndex = DAYS.indexOf(selectedDay as any);
+              const dayIndex =
+                selectedDay && DAYS.includes(selectedDay as (typeof DAYS)[number])
+                  ? DAYS.indexOf(selectedDay as (typeof DAYS)[number])
+                  : -1;
+              if (dayIndex === -1 || !selectedType) return null;
               const dayWorkouts = getWorkoutsForDay(dayIndex);
               const typeWorkouts = dayWorkouts.filter((w) => w.type === selectedType);
               const workoutsByType = groupWorkoutsByType(typeWorkouts);
-              const typeData = workoutsByType[selectedType!];
+              const typeData = workoutsByType[selectedType];
 
               // Show planned goal if available
               const plannedGoal =
@@ -410,14 +420,16 @@ export default function WeeklyPlanCard({
                     <div className="text-sm font-semibold text-gray-700 mb-2">Logged Workouts</div>
                     {typeData && typeData.allWorkouts.length > 0 ? (
                       <div className="space-y-2">
-                        {typeData.allWorkouts.map((item, idx) => {
+                        {typeData.allWorkouts.map((item) => {
                           const workout = item.workout;
                           const amount = workout.amount || workout.distance;
                           const unit = workout.unit || (workout.type === 'Swim' ? 'm' : 'km');
                           const member = item.member;
+                          const workoutId =
+                            workout._id?.toString() || workout.userId + workout.date;
                           return (
                             <div
-                              key={idx}
+                              key={workoutId}
                               className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
                             >
                               <span className="font-medium text-gray-900">
