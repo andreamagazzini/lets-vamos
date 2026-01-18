@@ -327,3 +327,138 @@ export function getInviteUrl(group: Group | null): string {
 
 // Re-export from date-utils for backward compatibility
 export { getDayIndex, isTodayDay as isToday } from './date-utils';
+
+export interface GroupStatistics {
+  totalCalories: number;
+  totalKilometers: number;
+  totalWorkouts: number;
+  totalDuration: number; // in minutes
+  activeDays: number;
+  averagePace: number | null; // min/km for Run workouts
+  currentStreak: number; // consecutive days with workouts
+  averageCaloriesPerWorkout: number | null; // average calories per workout
+}
+
+/**
+ * Calculate aggregated group statistics from workouts
+ */
+export function getGroupStatistics(workouts: Workout[]): GroupStatistics {
+  if (workouts.length === 0) {
+    return {
+      totalCalories: 0,
+      totalKilometers: 0,
+      totalWorkouts: 0,
+      totalDuration: 0,
+      activeDays: 0,
+      averagePace: null,
+      currentStreak: 0,
+      averageCaloriesPerWorkout: null,
+    };
+  }
+
+  let totalCalories = 0;
+  let totalKilometers = 0;
+  let totalDuration = 0;
+  let workoutsWithCalories = 0;
+  const uniqueDates = new Set<string>();
+  const runPaces: number[] = [];
+
+  workouts.forEach((workout) => {
+    // Sum calories
+    if (workout.calories) {
+      totalCalories += workout.calories;
+      workoutsWithCalories++;
+    }
+
+    // Sum distance (handle both amount/unit and legacy distance field)
+    const distance = workout.amount || workout.distance;
+    const unit = workout.unit || 'km';
+
+    if (distance !== undefined) {
+      // Convert to kilometers
+      if (unit === 'km') {
+        totalKilometers += distance;
+      } else if (unit === 'm') {
+        totalKilometers += distance / 1000;
+      } else if (unit === 'mi') {
+        totalKilometers += distance * 1.60934;
+      } else {
+        // Default to km if unit is unknown
+        totalKilometers += distance;
+      }
+    }
+
+    // Sum duration
+    if (workout.duration) {
+      totalDuration += workout.duration;
+    }
+
+    // Track unique dates
+    uniqueDates.add(workout.date);
+
+    // Collect run paces for average
+    if (workout.type === 'Run' && workout.avgPace) {
+      runPaces.push(workout.avgPace);
+    }
+  });
+
+  // Calculate average pace
+  const averagePace =
+    runPaces.length > 0
+      ? runPaces.reduce((sum, pace) => sum + pace, 0) / runPaces.length
+      : null;
+
+  // Calculate average calories per workout
+  const averageCaloriesPerWorkout =
+    workoutsWithCalories > 0 ? totalCalories / workoutsWithCalories : null;
+
+  // Calculate current streak (consecutive days with workouts)
+  const sortedDates = Array.from(uniqueDates)
+    .map((date) => new Date(date))
+    .sort((a, b) => b.getTime() - a.getTime()); // Most recent first
+
+  let currentStreak = 0;
+  if (sortedDates.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if today or yesterday has a workout
+    const mostRecentDate = sortedDates[0];
+    mostRecentDate.setHours(0, 0, 0, 0);
+
+    const daysDiff = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysDiff <= 1) {
+      // Start counting from most recent date
+      let expectedDate = new Date(mostRecentDate);
+      for (const workoutDate of sortedDates) {
+        const workoutDateOnly = new Date(workoutDate);
+        workoutDateOnly.setHours(0, 0, 0, 0);
+
+        if (
+          workoutDateOnly.getTime() === expectedDate.getTime() ||
+          workoutDateOnly.getTime() === expectedDate.getTime() - 86400000
+        ) {
+          currentStreak++;
+          expectedDate = new Date(workoutDateOnly);
+          expectedDate.setDate(expectedDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    totalCalories: Math.round(totalCalories),
+    totalKilometers: Math.round(totalKilometers * 10) / 10, // Round to 1 decimal
+    totalWorkouts: workouts.length,
+    totalDuration: Math.round(totalDuration),
+    activeDays: uniqueDates.size,
+    averagePace: averagePace ? Math.round(averagePace * 10) / 10 : null,
+    currentStreak,
+    averageCaloriesPerWorkout: averageCaloriesPerWorkout
+      ? Math.round(averageCaloriesPerWorkout)
+      : null,
+  };
+}
