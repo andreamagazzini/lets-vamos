@@ -76,11 +76,89 @@ export function formatPlannedWorkout(
       parts.push(`${workout.duration} min`);
     }
     // Legacy field - use amount/unit instead
-    if ((workout as any).distance) {
-      parts.push(`${(workout as any).distance} km`);
+    const legacyWorkout = workout as PlannedWorkout & { distance?: number };
+    if (legacyWorkout.distance) {
+      parts.push(`${legacyWorkout.distance} km`);
     }
   }
   return parts.join(' - ');
+}
+
+/**
+ * Format a workout for display in the calendar grid (with intervals and exercises)
+ * Used in setup-plan and edit-plan pages
+ */
+export function formatWorkoutForCalendar(workout: string | PlannedWorkout): string {
+  if (typeof workout === 'string') {
+    return workout;
+  }
+
+  let workoutText = workout.type;
+  if (workout.amount) {
+    workoutText += ` ${workout.amount}${workout.unit || 'km'}`;
+  }
+  if (workout.duration) {
+    workoutText += ` (${workout.duration}min)`;
+  }
+  if (workout.intervals && workout.intervals.length > 0) {
+    // Format intervals with repeats
+    const intervalParts: string[] = [];
+    const workoutType = workout.type;
+
+    workout.intervals.forEach((interval, idx) => {
+      const parts: string[] = [];
+
+      // For recovery intervals after a repeated work interval, show as ", time break"
+      if (interval.type === 'recovery' && idx > 0) {
+        const prevInterval = workout.intervals?.[idx - 1];
+        if (prevInterval?.repeats && prevInterval.repeats > 1) {
+          if (interval.time) {
+            const minutes = Math.floor(interval.time / 60);
+            if (minutes > 0) {
+              intervalParts.push(`, ${minutes}min break`);
+            } else {
+              intervalParts.push(`, ${interval.time}sec break`);
+            }
+          } else if (interval.distance) {
+            const unit = workoutType === 'Swim' ? 'm' : 'km';
+            intervalParts.push(`, ${interval.distance}${unit} break`);
+          }
+          return; // Skip adding this interval separately
+        }
+      }
+
+      // Add repeats prefix if > 1
+      if (interval.repeats && interval.repeats > 1) {
+        parts.push(`${interval.repeats}*`);
+      }
+
+      // Add distance
+      if (interval.distance) {
+        const unit = workoutType === 'Swim' ? 'm' : 'km';
+        parts.push(`${interval.distance}${unit}`);
+      }
+
+      // Add note
+      if (interval.note) {
+        parts.push(interval.note);
+      }
+
+      if (parts.length > 0) {
+        intervalParts.push(parts.join(' '));
+      }
+    });
+
+    if (intervalParts.length > 0) {
+      workoutText += ` • ${intervalParts.join(' ')}`;
+    } else {
+      workoutText += ` • ${workout.intervals.length} interval${workout.intervals.length > 1 ? 's' : ''}`;
+    }
+  }
+  if (workout.exercises && workout.exercises.length > 0) {
+    workoutText += ` • ${workout.exercises.length} exercise${workout.exercises.length > 1 ? 's' : ''}`;
+  }
+
+  return workoutText;
 }
 
 export function getRecentWorkouts(workouts: Workout[], days: number = 7): Workout[] {

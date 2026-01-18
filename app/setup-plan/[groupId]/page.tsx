@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import { useToast } from '@/components/Toast';
 import WorkoutFields from '@/components/workout-form/WorkoutFields';
 import { DAYS } from '@/lib/constants';
+import { formatWorkoutForCalendar } from '@/lib/dashboard-utils';
 import type { Exercise, Group, Interval, PlannedWorkout, WeeklyPlan } from '@/lib/db';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
@@ -228,109 +229,6 @@ export default function SetupPlanPage() {
     }
   };
 
-  // Interval handlers
-  const handleAddInterval = () => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      intervals: [...prev.intervals, { type: 'warmup' as const, repeats: undefined }],
-    }));
-    setIntervalsExpanded(true);
-  };
-
-  const handleRemoveInterval = (index: number) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      intervals: prev.intervals.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleUpdateInterval = (
-    index: number,
-    field: keyof Interval,
-    value: string | number | undefined
-  ) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      intervals: prev.intervals.map((interval, i) =>
-        i === index ? { ...interval, [field]: value } : interval
-      ),
-    }));
-  };
-
-  // Exercise handlers
-  const handleAddExercise = () => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: [...prev.exercises, { name: '', sets: [] }],
-    }));
-  };
-
-  const handleRemoveExercise = (index: number) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleUpdateExerciseName = (index: number, name: string) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.map((exercise, i) =>
-        i === index ? { ...exercise, name } : exercise
-      ),
-    }));
-  };
-
-  const handleAddSet = (exerciseIndex: number) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.map((exercise, i) =>
-        i === exerciseIndex ? { ...exercise, sets: [...exercise.sets, {}] } : exercise
-      ),
-    }));
-  };
-
-  const handleRemoveSet = (exerciseIndex: number, setIndex: number) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.map((exercise, i) =>
-        i === exerciseIndex
-          ? { ...exercise, sets: exercise.sets.filter((_, si) => si !== setIndex) }
-          : exercise
-      ),
-    }));
-  };
-
-  const handleUpdateSet = (
-    exerciseIndex: number,
-    setIndex: number,
-    field: 'reps' | 'weight',
-    value: string
-  ) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.map((exercise, i) =>
-        i === exerciseIndex
-          ? {
-              ...exercise,
-              sets: exercise.sets.map((set, si) =>
-                si === setIndex
-                  ? {
-                      ...set,
-                      [field]:
-                        value === ''
-                          ? undefined
-                          : field === 'reps'
-                            ? parseInt(value, 10)
-                            : parseFloat(value),
-                    }
-                  : set
-              ),
-            }
-          : exercise
-      ),
-    }));
-  };
 
   const handleDone = async () => {
     if (!group || !group._id) return;
@@ -411,78 +309,14 @@ export default function SetupPlanPage() {
                   <div className="flex-1 space-y-1 sm:space-y-1.5 mb-2 min-h-0 overflow-y-auto max-h-[100px] sm:max-h-[120px]">
                     {workouts.length > 0 ? (
                       workouts.map((workout, index) => {
-                        let workoutText = '';
-                        if (typeof workout === 'string') {
-                          workoutText = workout;
-                        } else {
-                          workoutText = workout.type;
-                          if (workout.amount) {
-                            workoutText += ` ${workout.amount}${workout.unit || 'km'}`;
-                          }
-                          if (workout.duration) {
-                            workoutText += ` (${workout.duration}min)`;
-                          }
-                          if (workout.intervals && workout.intervals.length > 0) {
-                            // Format intervals with repeats
-                            const intervalParts: string[] = [];
-                            const workoutType = workout.type;
-
-                            workout.intervals.forEach((interval, idx) => {
-                              const parts: string[] = [];
-
-                              // For recovery intervals after a repeated work interval, show as ", time break"
-                              if (interval.type === 'recovery' && idx > 0) {
-                                const prevInterval = workout.intervals?.[idx - 1];
-                                if (prevInterval?.repeats && prevInterval.repeats > 1) {
-                                  if (interval.time) {
-                                    const minutes = Math.floor(interval.time / 60);
-                                    if (minutes > 0) {
-                                      intervalParts.push(`, ${minutes}min break`);
-                                    } else {
-                                      intervalParts.push(`, ${interval.time}sec break`);
-                                    }
-                                  } else if (interval.distance) {
-                                    const unit = workoutType === 'Swim' ? 'm' : 'km';
-                                    intervalParts.push(`, ${interval.distance}${unit} break`);
-                                  }
-                                  return; // Skip adding this interval separately
-                                }
-                              }
-
-                              // Add repeats prefix if > 1
-                              if (interval.repeats && interval.repeats > 1) {
-                                parts.push(`${interval.repeats}*`);
-                              }
-
-                              // Add distance
-                              if (interval.distance) {
-                                const unit = workoutType === 'Swim' ? 'm' : 'km';
-                                parts.push(`${interval.distance}${unit}`);
-                              }
-
-                              // Add note
-                              if (interval.note) {
-                                parts.push(interval.note);
-                              }
-
-                              if (parts.length > 0) {
-                                intervalParts.push(parts.join(' '));
-                              }
-                            });
-
-                            if (intervalParts.length > 0) {
-                              workoutText += ` • ${intervalParts.join(' ')}`;
-                            } else {
-                              workoutText += ` • ${workout.intervals.length} interval${workout.intervals.length > 1 ? 's' : ''}`;
-                            }
-                          }
-                          if (workout.exercises && workout.exercises.length > 0) {
-                            workoutText += ` • ${workout.exercises.length} exercise${workout.exercises.length > 1 ? 's' : ''}`;
-                          }
-                        }
+                        const workoutText = formatWorkoutForCalendar(workout);
+                        const workoutKey =
+                          typeof workout === 'string'
+                            ? `${day}-${index}-${workout}`
+                            : `${day}-${index}-${workout.type}-${workout.notes || ''}`;
                         return (
                           <div
-                            key={index}
+                            key={workoutKey}
                             className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-lg text-xs border border-primary/20 w-full"
                           >
                             <button
@@ -637,6 +471,7 @@ export default function SetupPlanPage() {
                 className="flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg bg-gray-50"
               />
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="px-4 py-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors whitespace-nowrap text-sm sm:text-base"
               >
@@ -644,6 +479,7 @@ export default function SetupPlanPage() {
               </button>
             </div>
             <button
+              type="button"
               onClick={handleGoToDashboard}
               className="btn-primary w-full text-base sm:text-lg"
             >
