@@ -5,11 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { useToast } from '@/components/Toast';
-import BasicWorkoutFields from '@/components/workout-form/BasicWorkoutFields';
-import IntervalsSection from '@/components/workout-form/IntervalsSection';
-import StrengthTrainingSection from '@/components/workout-form/StrengthTrainingSection';
+import WorkoutFields from '@/components/workout-form/WorkoutFields';
 import { DAYS } from '@/lib/constants';
-import { getWorkoutTypes } from '@/lib/dashboard-utils';
 import type { Exercise, Group, Interval, PlannedWorkout, WeeklyPlan } from '@/lib/db';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
@@ -30,6 +27,7 @@ export default function SetupPlanPage() {
     notes: string;
     intervals: Interval[];
     exercises: Exercise[];
+    avgPace: string;
   }>({
     type: 'Run',
     amount: '',
@@ -38,6 +36,7 @@ export default function SetupPlanPage() {
     notes: '',
     intervals: [],
     exercises: [],
+    avgPace: '',
   });
   const [intervalsExpanded, setIntervalsExpanded] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -94,6 +93,7 @@ export default function SetupPlanPage() {
       notes: '',
       intervals: [],
       exercises: [],
+      avgPace: '',
     });
     setIntervalsExpanded(false);
   };
@@ -111,6 +111,7 @@ export default function SetupPlanPage() {
         notes: workout,
         intervals: [],
         exercises: [],
+        avgPace: '',
       });
     } else {
       setWorkoutForm({
@@ -121,11 +122,12 @@ export default function SetupPlanPage() {
         notes: workout.notes || '',
         intervals: workout.intervals || [],
         exercises: workout.exercises || [],
+        avgPace: workout.avgPace?.toString() || '',
       });
     }
     setEditingDay(day);
     setEditingIndex(index);
-    setIntervalsExpanded((workout as PlannedWorkout)?.intervals?.length > 0 || false);
+    setIntervalsExpanded(((workout as PlannedWorkout)?.intervals?.length || 0) > 0);
   };
 
   const handleSaveWorkout = () => {
@@ -146,6 +148,7 @@ export default function SetupPlanPage() {
       notes: workoutForm.notes.trim() || undefined,
       intervals: workoutForm.intervals.length > 0 ? workoutForm.intervals : undefined,
       exercises: workoutForm.exercises.length > 0 ? workoutForm.exercises : undefined,
+      avgPace: workoutForm.avgPace ? parseFloat(workoutForm.avgPace) : undefined,
     };
 
     if (editingIndex !== null) {
@@ -165,6 +168,7 @@ export default function SetupPlanPage() {
       notes: '',
       intervals: [],
       exercises: [],
+      avgPace: '',
     });
     setIntervalsExpanded(false);
     setEditingDay(null);
@@ -182,6 +186,7 @@ export default function SetupPlanPage() {
       notes: '',
       intervals: [],
       exercises: [],
+      avgPace: '',
     });
     setIntervalsExpanded(false);
   };
@@ -427,11 +432,10 @@ export default function SetupPlanPage() {
 
                               // For recovery intervals after a repeated work interval, show as ", time break"
                               if (interval.type === 'recovery' && idx > 0) {
-                                const prevInterval = workout.intervals[idx - 1];
-                                if (prevInterval.repeats && prevInterval.repeats > 1) {
+                                const prevInterval = workout.intervals?.[idx - 1];
+                                if (prevInterval?.repeats && prevInterval.repeats > 1) {
                                   if (interval.time) {
                                     const minutes = Math.floor(interval.time / 60);
-                                    const seconds = interval.time % 60;
                                     if (minutes > 0) {
                                       intervalParts.push(`, ${minutes}min break`);
                                     } else {
@@ -559,166 +563,43 @@ export default function SetupPlanPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Workout Type Selector */}
-              <div>
-                <label
-                  htmlFor="workout-type"
-                  className="block text-sm font-semibold text-black mb-3"
-                >
-                  Workout Type
-                </label>
-                <select
-                  id="workout-type"
-                  value={workoutForm.type}
-                  onChange={(e) => {
-                    const newType = e.target.value;
-                    if (newType === '__custom__') {
-                      // Handle custom type input (similar to BasicWorkoutFields)
-                      const customType = prompt('Enter custom workout type (max 30 characters):');
-                      if (customType && customType.trim() && customType.length <= 30) {
-                        handleAddCustomType(customType.trim());
-                      }
-                      return;
-                    }
-                    // Clear intervals/exercises when switching types
-                    setWorkoutForm((prev) => ({
-                      ...prev,
-                      type: newType,
-                      intervals:
-                        newType === 'Run' || newType === 'Bike' || newType === 'Swim'
-                          ? prev.intervals
-                          : [],
-                      exercises: newType === 'Strength' ? prev.exercises : [],
-                    }));
-                  }}
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
-                >
-                  {getWorkoutTypes(group)
-                    .filter((t) => t !== 'Rest')
-                    .map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  <option value="__custom__">+ Add Custom Type</option>
-                </select>
-              </div>
-
-              {/* Amount and Unit - Only for non-Strength types */}
-              {workoutForm.type !== 'Strength' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="workout-amount"
-                      className="block text-sm font-semibold text-black mb-3"
-                    >
-                      Amount
-                    </label>
-                    <input
-                      id="workout-amount"
-                      type="number"
-                      step="0.01"
-                      value={workoutForm.amount || ''}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({ ...prev, amount: e.target.value }))
-                      }
-                      placeholder="e.g., 5"
-                      className="w-full px-6 py-4 h-[56px] border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="workout-unit"
-                      className="block text-sm font-semibold text-black mb-3"
-                    >
-                      Unit
-                    </label>
-                    <select
-                      id="workout-unit"
-                      value={workoutForm.unit || ''}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({ ...prev, unit: e.target.value }))
-                      }
-                      className="w-full px-6 py-4 h-[56px] border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
-                    >
-                      <option value="">Select unit</option>
-                      {['km', 'mi', 'm', 'yd', 'min', 'hr'].map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Intervals Section for Run/Bike/Swim */}
-              {(workoutForm.type === 'Run' ||
-                workoutForm.type === 'Bike' ||
-                workoutForm.type === 'Swim') && (
-                <IntervalsSection
-                  type={workoutForm.type as 'Run' | 'Bike' | 'Swim'}
-                  intervals={workoutForm.intervals}
-                  expanded={intervalsExpanded}
-                  onToggle={() => setIntervalsExpanded(!intervalsExpanded)}
-                  onAdd={handleAddInterval}
-                  onRemove={handleRemoveInterval}
-                  onUpdate={handleUpdateInterval}
-                />
-              )}
-
-              {/* Strength Training Section */}
-              {workoutForm.type === 'Strength' && (
-                <StrengthTrainingSection
-                  exercises={workoutForm.exercises}
-                  errors={{}}
-                  onAddExercise={handleAddExercise}
-                  onRemoveExercise={handleRemoveExercise}
-                  onUpdateExerciseName={handleUpdateExerciseName}
-                  onAddSet={handleAddSet}
-                  onRemoveSet={handleRemoveSet}
-                  onUpdateSet={handleUpdateSet}
-                />
-              )}
-
-              {/* Duration - Available for all types */}
-              <div>
-                <label
-                  htmlFor="workout-duration"
-                  className="block text-sm font-semibold text-black mb-3"
-                >
-                  Duration (minutes)
-                </label>
-                <input
-                  id="workout-duration"
-                  type="number"
-                  step="1"
-                  value={workoutForm.duration || ''}
-                  onChange={(e) =>
-                    setWorkoutForm((prev) => ({ ...prev, duration: e.target.value }))
-                  }
-                  placeholder="e.g., 30"
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
-                />
-              </div>
-
-              {/* Notes - Available for all types */}
-              <div>
-                <label
-                  htmlFor="workout-notes"
-                  className="block text-sm font-semibold text-black mb-3"
-                >
-                  Notes (optional)
-                </label>
-                <textarea
-                  id="workout-notes"
-                  value={workoutForm.notes}
-                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="e.g., Easy pace, Upper body focus"
-                  rows={3}
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-primary transition-colors resize-none"
-                />
-              </div>
+              <WorkoutFields
+                group={group}
+                type={workoutForm.type}
+                amount={workoutForm.amount}
+                unit={workoutForm.unit}
+                duration={workoutForm.duration}
+                notes={workoutForm.notes}
+                intervals={workoutForm.intervals}
+                exercises={workoutForm.exercises}
+                avgPace={workoutForm.avgPace}
+                onTypeChange={(type) => {
+                  setWorkoutForm((prev) => ({
+                    ...prev,
+                    type,
+                    intervals:
+                      type === 'Run' || type === 'Bike' || type === 'Swim' ? prev.intervals : [],
+                    exercises: type === 'Strength' ? prev.exercises : [],
+                  }));
+                }}
+                onAmountChange={(amount) => setWorkoutForm((prev) => ({ ...prev, amount }))}
+                onUnitChange={(unit) => setWorkoutForm((prev) => ({ ...prev, unit }))}
+                onDurationChange={(duration) => setWorkoutForm((prev) => ({ ...prev, duration }))}
+                onNotesChange={(notes) => setWorkoutForm((prev) => ({ ...prev, notes }))}
+                onIntervalsChange={(intervals) =>
+                  setWorkoutForm((prev) => ({ ...prev, intervals }))
+                }
+                onExercisesChange={(exercises) =>
+                  setWorkoutForm((prev) => ({ ...prev, exercises }))
+                }
+                onAvgPaceChange={(avgPace) => setWorkoutForm((prev) => ({ ...prev, avgPace }))}
+                showCustomType={true}
+                onCustomTypeAdd={handleAddCustomType}
+                errors={{}}
+                showDuration={true}
+                intervalsExpanded={intervalsExpanded}
+                onToggleIntervals={() => setIntervalsExpanded(!intervalsExpanded)}
+              />
 
               <div className="flex gap-3 pt-4">
                 <button

@@ -19,6 +19,7 @@ export const PlannedWorkoutSchema = z.object({
   notes: z.string().optional(),
   intervals: z.array(IntervalSchema).optional(),
   exercises: z.array(ExerciseSchema).optional(),
+  avgPace: z.number().optional(), // min/km for Run
 });
 
 export const WeeklyPlanSchema = z.record(

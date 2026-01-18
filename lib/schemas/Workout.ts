@@ -30,12 +30,14 @@ export const WorkoutSchema = z.object({
   unit: z.string().optional(),
   notes: z.string().optional(),
   date: z.string().min(1),
-  // Cardio fields
-  calories: z.number().optional(),
-  avgHeartRate: z.number().optional(),
-  intervals: z.array(IntervalSchema).optional(),
-  // Bike-specific
-  avgSpeed: z.number().optional(), // km/h
+    // Cardio fields
+    calories: z.number().optional(),
+    avgHeartRate: z.number().optional(),
+    intervals: z.array(IntervalSchema).optional(),
+    // Run-specific
+    avgPace: z.number().optional(), // min/km
+    // Bike-specific
+    avgSpeed: z.number().optional(), // km/h
   // Swim-specific
   distancePer100m: z.number().optional(), // seconds per 100m
   laps: z.number().optional(),

@@ -5,7 +5,7 @@ import { Flame, Heart, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Group, Member, Workout } from '@/lib/db';
 import DatePicker from './DatePicker';
-import BasicWorkoutFields from './workout-form/BasicWorkoutFields';
+import WorkoutFields from './workout-form/WorkoutFields';
 import {
   buildWorkoutData,
   initializeFormState,
@@ -37,11 +37,14 @@ export default function LogWorkoutModal({
 
   const [state, setState] = useState<WorkoutFormState>(() => initializeFormState(workout));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [intervalsExpanded, setIntervalsExpanded] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setState(initializeFormState(workout));
+    const newState = initializeFormState(workout);
+    setState(newState);
+    setIntervalsExpanded((newState.intervals?.length || 0) > 0);
   }, [workout]);
 
   // Focus management for accessibility
@@ -146,17 +149,34 @@ export default function LogWorkoutModal({
             )}
           </div>
 
-          {/* Basic Workout Fields */}
-          <BasicWorkoutFields
+          {/* Workout Fields */}
+          <WorkoutFields
             group={group}
             type={state.type}
             amount={state.amount}
             unit={state.unit}
             duration={state.duration}
-            onTypeChange={(type) => updateState({ type })}
+            notes={state.notes}
+            intervals={state.intervals}
+            exercises={state.exercises}
+            avgPace={state.avgPace}
+            onTypeChange={(type) => {
+              updateState({ type });
+              // Clear intervals/exercises when switching types
+              if (type !== 'Run' && type !== 'Bike' && type !== 'Swim') {
+                updateState({ intervals: [] });
+              }
+              if (type !== 'Strength') {
+                updateState({ exercises: [] });
+              }
+            }}
             onAmountChange={(amount) => updateState({ amount })}
             onUnitChange={(unit) => updateState({ unit })}
             onDurationChange={(duration) => updateState({ duration })}
+            onNotesChange={(notes) => updateState({ notes })}
+            onIntervalsChange={(intervals) => updateState({ intervals })}
+            onExercisesChange={(exercises) => updateState({ exercises })}
+            onAvgPaceChange={(avgPace) => updateState({ avgPace })}
             showCustomType={true}
             onCustomTypeAdd={async (newType) => {
               // Add custom type to group
@@ -172,6 +192,8 @@ export default function LogWorkoutModal({
             }}
             errors={errors}
             showDuration={true}
+            intervalsExpanded={intervalsExpanded}
+            onToggleIntervals={() => setIntervalsExpanded(!intervalsExpanded)}
           />
 
           {/* Calories and Avg Heart Rate - Available for all types */}
@@ -220,20 +242,6 @@ export default function LogWorkoutModal({
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label htmlFor="notes" className="block text-sm font-semibold text-black mb-3">
-              Notes - Optional
-            </label>
-            <textarea
-              id="notes"
-              value={state.notes}
-              onChange={(e) => updateState({ notes: e.target.value })}
-              rows={3}
-              className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-primary transition-colors resize-none"
-              placeholder="Felt great, good pace"
-            />
-          </div>
 
           {errors.form && (
             <p className="mt-2 text-sm text-red-600 font-medium" role="alert">
