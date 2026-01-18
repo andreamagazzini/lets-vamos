@@ -280,9 +280,7 @@ export default function SetupPlanPage() {
     setWorkoutForm((prev) => ({
       ...prev,
       exercises: prev.exercises.map((exercise, i) =>
-        i === exerciseIndex
-          ? { ...exercise, sets: [...exercise.sets, {}] }
-          : exercise
+        i === exerciseIndex ? { ...exercise, sets: [...exercise.sets, {}] } : exercise
       ),
     }));
   };
@@ -314,7 +312,12 @@ export default function SetupPlanPage() {
                 si === setIndex
                   ? {
                       ...set,
-                      [field]: value === '' ? undefined : field === 'reps' ? parseInt(value, 10) : parseFloat(value),
+                      [field]:
+                        value === ''
+                          ? undefined
+                          : field === 'reps'
+                            ? parseInt(value, 10)
+                            : parseFloat(value),
                     }
                   : set
               ),
@@ -506,7 +509,10 @@ export default function SetupPlanPage() {
             <div className="space-y-4">
               {/* Workout Type Selector */}
               <div>
-                <label htmlFor="workout-type" className="block text-sm font-semibold text-black mb-3">
+                <label
+                  htmlFor="workout-type"
+                  className="block text-sm font-semibold text-black mb-3"
+                >
                   Workout Type
                 </label>
                 <select
@@ -526,7 +532,10 @@ export default function SetupPlanPage() {
                     setWorkoutForm((prev) => ({
                       ...prev,
                       type: newType,
-                      intervals: newType === 'Run' || newType === 'Bike' || newType === 'Swim' ? prev.intervals : [],
+                      intervals:
+                        newType === 'Run' || newType === 'Bike' || newType === 'Swim'
+                          ? prev.intervals
+                          : [],
                       exercises: newType === 'Strength' ? prev.exercises : [],
                     }));
                   }}
@@ -547,7 +556,10 @@ export default function SetupPlanPage() {
               {workoutForm.type !== 'Strength' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="workout-amount" className="block text-sm font-semibold text-black mb-3">
+                    <label
+                      htmlFor="workout-amount"
+                      className="block text-sm font-semibold text-black mb-3"
+                    >
                       Amount
                     </label>
                     <input
@@ -555,19 +567,26 @@ export default function SetupPlanPage() {
                       type="number"
                       step="0.01"
                       value={workoutForm.amount || ''}
-                      onChange={(e) => setWorkoutForm((prev) => ({ ...prev, amount: e.target.value }))}
+                      onChange={(e) =>
+                        setWorkoutForm((prev) => ({ ...prev, amount: e.target.value }))
+                      }
                       placeholder="e.g., 5"
                       className="w-full px-6 py-4 h-[56px] border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
                     />
                   </div>
                   <div>
-                    <label htmlFor="workout-unit" className="block text-sm font-semibold text-black mb-3">
+                    <label
+                      htmlFor="workout-unit"
+                      className="block text-sm font-semibold text-black mb-3"
+                    >
                       Unit
                     </label>
                     <select
                       id="workout-unit"
                       value={workoutForm.unit || ''}
-                      onChange={(e) => setWorkoutForm((prev) => ({ ...prev, unit: e.target.value }))}
+                      onChange={(e) =>
+                        setWorkoutForm((prev) => ({ ...prev, unit: e.target.value }))
+                      }
                       className="w-full px-6 py-4 h-[56px] border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
                     >
                       <option value="">Select unit</option>
@@ -612,7 +631,10 @@ export default function SetupPlanPage() {
 
               {/* Duration - Available for all types */}
               <div>
-                <label htmlFor="workout-duration" className="block text-sm font-semibold text-black mb-3">
+                <label
+                  htmlFor="workout-duration"
+                  className="block text-sm font-semibold text-black mb-3"
+                >
                   Duration (minutes)
                 </label>
                 <input
@@ -620,7 +642,9 @@ export default function SetupPlanPage() {
                   type="number"
                   step="1"
                   value={workoutForm.duration || ''}
-                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, duration: e.target.value }))}
+                  onChange={(e) =>
+                    setWorkoutForm((prev) => ({ ...prev, duration: e.target.value }))
+                  }
                   placeholder="e.g., 30"
                   className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors bg-white"
                 />
