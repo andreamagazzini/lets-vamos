@@ -1,18 +1,18 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function JoinPage() {
-  const router = useRouter()
-  const [inviteCode, setInviteCode] = useState('')
+  const router = useRouter();
+  const [inviteCode, setInviteCode] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (inviteCode.trim()) {
-      router.push(`/join/${inviteCode.trim().toUpperCase()}`)
+      router.push(`/join/${inviteCode.trim().toUpperCase()}`);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-white">
@@ -32,14 +32,11 @@ export default function JoinPage() {
               placeholder="ABC123XY"
             />
           </div>
-          <button
-            type="submit"
-            className="btn-primary w-full text-lg"
-          >
+          <button type="submit" className="btn-primary w-full text-lg">
             Join Group →
           </button>
         </form>
       </div>
     </div>
-  )
+  );
 }

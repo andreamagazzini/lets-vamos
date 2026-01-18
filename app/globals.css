@@ -5,32 +5,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Logo-inspired Color Palette */
-  --primary: #1e3a8a; /* Dark blue - main brand color */
-  --primary-dark: #1e40af; /* Darker blue for hover states */
-  --primary-light: #3b82f6; /* Lighter blue for accents */
-  --accent: #60a5fa; /* Light blue - accent color (arrow/apostrophe) */
-  --accent-light: #93c5fd; /* Lighter accent */
-  --success: #10b981; /* Green for success states */
-  --warning: #f59e0b; /* Orange for warnings */
+  /* Logo Color Palette */
+  --primary: #02182c; /* Very dark navy - main brand color */
+  --primary-dark: #010f1a; /* Darker for hover states */
+  --primary-light: #033a5e; /* Lighter navy for subtle backgrounds */
+  --accent: #2888fb; /* Bright blue - accent color */
+  --accent-light: #5ba3fc; /* Lighter blue for hover states */
+  --accent-dark: #1e6fd9; /* Darker blue for pressed states */
+  --background: #fcfcfa; /* Off-white/cream background */
+  --background-alt: #f8f8f6; /* Slightly darker for cards */
   
-  /* Neutrals - Modern grays */
-  --gray-50: #FAFAFA;
-  --gray-100: #F5F5F5;
-  --gray-200: #E5E5E5;
-  --gray-300: #D4D4D4;
-  --gray-400: #A3A3A3;
-  --gray-500: #737373;
-  --gray-600: #525252;
-  --gray-700: #404040;
-  --gray-800: #262626;
-  --gray-900: #171717;
+  /* Complementary colors that work with the palette */
+  --success: #10b981; /* Green for success states */
+  --success-light: #34d399; /* Lighter green */
+  --warning: #f59e0b; /* Orange for warnings */
+  --warning-light: #fbbf24; /* Lighter orange */
+  --error: #ef4444; /* Red for errors */
+  --error-light: #f87171; /* Lighter red */
+  
+  /* Neutrals - Modern grays that complement the palette */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
 
   /* Text */
-  --text-primary: #1e3a8a; /* Dark blue text */
-  --text-secondary: #525252;
-  --text-tertiary: #737373;
-  --text-white: #ffffff; /* White text for dark backgrounds */
+  --text-primary: #02182c; /* Dark navy text */
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-on-dark: #fcfcfa; /* Cream text for dark backgrounds */
+  --text-white: #ffffff; /* Pure white for high contrast */
 }
 
 * {
@@ -50,7 +60,7 @@ body {
 
 body {
   color: var(--text-primary);
-  background: #FFFFFF;
+  background: var(--background);
 }
 
 /* Dark blue backgrounds for hero sections */
@@ -117,20 +127,20 @@ body {
 
 /* Modern Button Styles - Logo Color Palette */
 .btn-primary {
-  @apply bg-[#1e3a8a] text-white font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#1e40af] hover:scale-105 active:scale-100 shadow-lg hover:shadow-xl;
+  @apply bg-[#02182c] text-[#fcfcfa] font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#010f1a] hover:scale-105 active:scale-100 shadow-lg hover:shadow-xl;
 }
 
 .btn-secondary {
-  @apply bg-white text-[#1e3a8a] border-2 border-[#1e3a8a] font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#1e3a8a] hover:text-white hover:scale-105 active:scale-100;
+  @apply bg-[#fcfcfa] text-[#02182c] border-2 border-[#02182c] font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#02182c] hover:text-[#fcfcfa] hover:scale-105 active:scale-100;
 }
 
 .btn-accent {
-  @apply bg-[#60a5fa] text-white font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#3b82f6] hover:scale-105 active:scale-100 shadow-lg hover:shadow-xl;
+  @apply bg-[#2888fb] text-white font-semibold py-4 px-8 rounded-full transition-all duration-200 hover:bg-[#1e6fd9] hover:scale-105 active:scale-100 shadow-lg hover:shadow-xl;
 }
 
 /* Card Styles */
 .card-modern {
-  @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-8 transition-all duration-200 hover:shadow-lg;
+  @apply bg-[#fcfcfa] rounded-2xl shadow-sm border border-gray-200 p-8 transition-all duration-200 hover:shadow-lg;
 }
 
 /* Smooth Animations */

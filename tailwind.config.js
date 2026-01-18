@@ -9,19 +9,30 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#1e3a8a', // Dark blue - main brand
-          dark: '#1e40af', // Darker blue
-          light: '#3b82f6', // Lighter blue
+          DEFAULT: '#02182c', // Very dark navy - main brand
+          dark: '#010f1a', // Darker for hover states
+          light: '#033a5e', // Lighter navy for subtle backgrounds
         },
         accent: {
-          DEFAULT: '#60a5fa', // Light blue - accent (arrow/apostrophe)
-          light: '#93c5fd', // Lighter accent
+          DEFAULT: '#2888fb', // Bright blue - accent color
+          light: '#5ba3fc', // Lighter blue for hover
+          dark: '#1e6fd9', // Darker blue for pressed states
+        },
+        background: {
+          DEFAULT: '#fcfcfa', // Off-white/cream background
+          alt: '#f8f8f6', // Slightly darker for cards
         },
         success: {
           DEFAULT: '#10b981', // Green
+          light: '#34d399', // Lighter green
         },
         warning: {
           DEFAULT: '#f59e0b', // Orange
+          light: '#fbbf24', // Lighter orange
+        },
+        error: {
+          DEFAULT: '#ef4444', // Red
+          light: '#f87171', // Lighter red
         },
         gray: {
           50: '#FAFAFA',
