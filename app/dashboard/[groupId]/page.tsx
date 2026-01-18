@@ -1,115 +1,150 @@
-"use client";
+'use client';
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
-import type { Workout } from "@/lib/db";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import LogWorkoutModal from "@/components/LogWorkoutModal";
-import CountdownCard from "@/components/dashboard/CountdownCard";
-import WeeklyPlanCard from "@/components/dashboard/WeeklyPlanCard";
-import ProgressChart from "@/components/dashboard/ProgressChart";
-import RecentActivity from "@/components/dashboard/RecentActivity";
-import InviteSection from "@/components/dashboard/InviteSection";
-import EditableEmoji from "@/components/dashboard/EditableEmoji";
+import { useUser } from '@clerk/nextjs';
+import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import CountdownCard from '@/components/dashboard/CountdownCard';
+import EditableEmoji from '@/components/dashboard/EditableEmoji';
+import InviteSection from '@/components/dashboard/InviteSection';
+import ProgressChart from '@/components/dashboard/ProgressChart';
+import RecentActivity from '@/components/dashboard/RecentActivity';
+import WeeklyPlanCard from '@/components/dashboard/WeeklyPlanCard';
+import { DashboardSkeleton } from '@/components/LoadingSkeleton';
+import LogWorkoutModal from '@/components/LogWorkoutModal';
+import Navbar from '@/components/Navbar';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import type { Workout } from '@/lib/db';
+import { isValidRouteParam } from '@/lib/validation';
 
 export default function DashboardPage() {
-	const params = useParams();
-	const groupId = params.groupId as string;
-	const [showLogModal, setShowLogModal] = useState(false);
-	const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const params = useParams();
+  const router = useRouter();
+  const groupIdParam = params.groupId;
+  const groupId = isValidRouteParam(groupIdParam) ? groupIdParam : null;
+  const { user, isLoaded: userLoaded } = useUser();
 
-	const {
-		group,
-		members,
-		workouts,
-		loading,
-		handleSaveWorkout: saveWorkout,
-		handleDeleteWorkout,
-		handleUpdateGroup,
-	} = useDashboardData(groupId);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
 
-	const handleLogWorkout = () => {
-		setEditingWorkout(null);
-		setShowLogModal(true);
-	};
+  const {
+    group,
+    members,
+    workouts,
+    loading,
+    handleSaveWorkout: saveWorkout,
+    handleDeleteWorkout,
+    handleUpdateGroup,
+  } = useDashboardData(groupId || '');
 
-	const handleEditWorkout = (workout: Workout) => {
-		setEditingWorkout(workout);
-		setShowLogModal(true);
-	};
+  if (!groupId || !userLoaded) {
+    return <DashboardSkeleton />;
+  }
 
-	const handleSaveWorkout = async (
-		workoutData: Omit<Workout, "id" | "createdAt">,
-	) => {
-		await saveWorkout(workoutData, editingWorkout);
-		setShowLogModal(false);
-		setEditingWorkout(null);
-	};
+  if (!user) {
+    router.push('/');
+    return null;
+  }
 
-	if (loading || !group) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="text-gray-500">Loading...</div>
-			</div>
-		);
-	}
+  const handleLogWorkout = () => {
+    setEditingWorkout(null);
+    setShowLogModal(true);
+  };
 
-	return (
-		<div className="min-h-screen bg-white">
-			<div className="max-w-7xl mx-auto p-6 md:p-12">
-				{/* Header */}
-				<div className="mb-8">
-					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-						<div className="flex items-center gap-3">
-							<EditableEmoji
-								emoji={group.emoji || "🏃"}
-								onChange={(emoji) => handleUpdateGroup({ emoji })}
-								size="lg"
-							/>
-							<h1 className="heading-lg text-black tracking-tight">
-								{group.name}
-							</h1>
-						</div>
-						<button
-							onClick={handleLogWorkout}
-							type="button"
-							className="btn-primary text-base"
-						>
-							+ Log Workout
-						</button>
-					</div>
+  const handleEditWorkout = (workout: Workout) => {
+    setEditingWorkout(workout);
+    setShowLogModal(true);
+  };
 
-					<CountdownCard group={group} onUpdateGroup={handleUpdateGroup} />
-				</div>
+  const handleSaveWorkout = async (workoutData: Omit<Workout, '_id' | 'createdAt'>) => {
+    await saveWorkout(workoutData, editingWorkout);
+    setShowLogModal(false);
+    setEditingWorkout(null);
+  };
 
-				{/* Weekly Plan Progress Chart */}
-				<ProgressChart group={group} members={members} workouts={workouts} />
+  if (loading || !group) {
+    return <DashboardSkeleton />;
+  }
 
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-					<WeeklyPlanCard group={group} onUpdateGroup={handleUpdateGroup} />
-					<RecentActivity
-						members={members}
-						workouts={workouts}
-						onEditWorkout={handleEditWorkout}
-						onDeleteWorkout={handleDeleteWorkout}
-					/>
-				</div>
+  return (
+    <div className="min-h-screen bg-white">
+      <Navbar currentGroupId={groupId} />
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-12">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <EditableEmoji
+                emoji={group.emoji || '🏃'}
+                onChange={(emoji) => handleUpdateGroup({ emoji })}
+                size="lg"
+              />
+              <h1 className="heading-lg text-black tracking-tight">{group.name}</h1>
+            </div>
+            <button
+              onClick={handleLogWorkout}
+              type="button"
+              className="btn-primary text-base hidden md:block"
+            >
+              + Log Workout
+            </button>
+          </div>
 
-				<InviteSection group={group} />
-			</div>
+          <CountdownCard group={group} onUpdateGroup={handleUpdateGroup} />
 
-			{showLogModal && (
-				<LogWorkoutModal
-					groupId={groupId}
-					members={members}
-					workout={editingWorkout}
-					onSave={handleSaveWorkout}
-					onClose={() => {
-						setShowLogModal(false);
-						setEditingWorkout(null);
-					}}
-				/>
-			)}
-		</div>
-	);
+          {/* Log Workout button for mobile - shown below countdown */}
+          <button
+            onClick={handleLogWorkout}
+            type="button"
+            className="btn-primary text-base w-full mt-4 md:hidden"
+          >
+            + Log Workout
+          </button>
+        </div>
+
+        {/* Weekly Plan - Full width */}
+        <div className="mb-6">
+          <WeeklyPlanCard
+            group={group}
+            workouts={workouts}
+            members={members}
+            onUpdateGroup={handleUpdateGroup}
+          />
+        </div>
+
+        {/* Progress Chart and Recent Activity - Side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Weekly Plan Progress Chart - 50% width */}
+          <div>
+            <ProgressChart group={group} members={members} workouts={workouts} />
+          </div>
+          {/* Recent Activity - 50% width */}
+          <div>
+            <RecentActivity
+              members={members}
+              workouts={workouts}
+              onEditWorkout={handleEditWorkout}
+              onDeleteWorkout={handleDeleteWorkout}
+            />
+          </div>
+        </div>
+
+        <InviteSection group={group} />
+      </div>
+
+      {showLogModal && (
+        <LogWorkoutModal
+          groupId={groupId}
+          group={group}
+          members={members}
+          workout={editingWorkout}
+          onSave={handleSaveWorkout}
+          onClose={() => {
+            setShowLogModal(false);
+            setEditingWorkout(null);
+          }}
+          onUpdateGroup={handleUpdateGroup}
+        />
+      )}
+    </div>
+  );
 }

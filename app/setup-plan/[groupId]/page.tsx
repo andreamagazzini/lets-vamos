@@ -1,202 +1,448 @@
-'use client'
+'use client';
 
-import { useRouter, useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { getGroup, createGroup } from '@/lib/db'
-import type { Group, WeeklyPlan } from '@/lib/db'
-
-const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+import { Plus, X } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Navbar from '@/components/Navbar';
+import { useToast } from '@/components/Toast';
+import BasicWorkoutFields from '@/components/workout-form/BasicWorkoutFields';
+import { DAYS } from '@/lib/constants';
+import type { Group, PlannedWorkout, WeeklyPlan } from '@/lib/db';
+import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
 export default function SetupPlanPage() {
-  const router = useRouter()
-  const params = useParams()
-  const groupId = params.groupId as string
-  const [group, setGroup] = useState<Group | null>(null)
-  const [trainingPlan, setTrainingPlan] = useState<WeeklyPlan>({})
-  const [editingDay, setEditingDay] = useState<string | null>(null)
-  const [workoutInput, setWorkoutInput] = useState('')
-  const [showInviteModal, setShowInviteModal] = useState(false)
+  const router = useRouter();
+  const params = useParams();
+  const toast = useToast();
+  const groupId = params.groupId as string;
+  const [group, setGroup] = useState<Group | null>(null);
+  const [trainingPlan, setTrainingPlan] = useState<WeeklyPlan>({});
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [workoutForm, setWorkoutForm] = useState<{
+    type: string;
+    amount: string;
+    unit: string;
+    duration: string;
+    notes: string;
+  }>({
+    type: 'Run',
+    amount: '',
+    unit: '',
+    duration: '',
+    notes: '',
+  });
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const loadedGroupIdRef = useRef<string | null>(null);
+
+  const loadGroup = useCallback(async () => {
+    if (!groupId) return;
+
+    // Prevent reloading if we already have this group loaded
+    if (loadedGroupIdRef.current === groupId) {
+      return;
+    }
+
+    setLoading(true);
+    const { data: response, error } = await handleAsync(async () => {
+      const res = await fetch(`/api/groups/${groupId}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to load group');
+      }
+      return await res.json();
+    }, 'loadGroup');
+
+    if (error || !response?.group) {
+      toast.error('Failed to load group');
+      router.push('/');
+      setLoading(false);
+      return;
+    }
+
+    setGroup(response.group);
+    setTrainingPlan(response.group.trainingPlan || {});
+    loadedGroupIdRef.current = groupId;
+    setLoading(false);
+  }, [groupId, router, toast]);
 
   useEffect(() => {
-    loadGroup()
-  }, [groupId])
-
-  const loadGroup = async () => {
-    const loadedGroup = await getGroup(groupId)
-    if (!loadedGroup) {
-      router.push('/')
-      return
+    if (groupId && loadedGroupIdRef.current !== groupId) {
+      loadGroup();
     }
-    setGroup(loadedGroup)
-    setTrainingPlan(loadedGroup.trainingPlan || {})
-  }
+    // Only run when groupId changes, not when loadGroup changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, loadGroup]);
 
   const handleAddWorkout = (day: string) => {
-    setEditingDay(day)
-    setWorkoutInput('')
-  }
+    setEditingDay(day);
+    setEditingIndex(null);
+    setWorkoutForm({
+      type: 'Run',
+      amount: '',
+      unit: '',
+      duration: '',
+      notes: '',
+    });
+  };
+
+  const handleEditWorkout = (day: string, index: number) => {
+    const workouts = trainingPlan[day] || [];
+    const workout = workouts[index];
+
+    if (typeof workout === 'string') {
+      setWorkoutForm({
+        type: 'Run',
+        amount: '',
+        unit: '',
+        duration: '',
+        notes: workout,
+      });
+    } else {
+      setWorkoutForm({
+        type: workout.type,
+        amount: workout.amount?.toString() || '',
+        unit: workout.unit || '',
+        duration: workout.duration?.toString() || '',
+        notes: workout.notes || '',
+      });
+    }
+    setEditingDay(day);
+    setEditingIndex(index);
+  };
 
   const handleSaveWorkout = () => {
-    if (!workoutInput.trim() || !editingDay) return
+    if (!editingDay) return;
 
-    const day = editingDay
-    const newPlan = { ...trainingPlan }
+    const day = editingDay;
+    const newPlan = { ...trainingPlan };
     if (!newPlan[day]) {
-      newPlan[day] = []
+      newPlan[day] = [];
     }
-    newPlan[day] = [...newPlan[day], workoutInput.trim()]
-    setTrainingPlan(newPlan)
-    setWorkoutInput('')
-    setEditingDay(null)
-  }
+
+    // Create structured workout
+    const plannedWorkout: PlannedWorkout = {
+      type: workoutForm.type,
+      duration: workoutForm.duration ? parseInt(workoutForm.duration, 10) : undefined,
+      amount: workoutForm.amount ? parseFloat(workoutForm.amount) : undefined,
+      unit: workoutForm.unit || undefined,
+      notes: workoutForm.notes.trim() || undefined,
+    };
+
+    if (editingIndex !== null) {
+      // Update existing workout
+      newPlan[day][editingIndex] = plannedWorkout;
+    } else {
+      // Add new workout
+      newPlan[day] = [...newPlan[day], plannedWorkout];
+    }
+
+    setTrainingPlan(newPlan);
+    setWorkoutForm({
+      type: 'Run',
+      amount: '',
+      unit: '',
+      duration: '',
+      notes: '',
+    });
+    setEditingDay(null);
+    setEditingIndex(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDay(null);
+    setEditingIndex(null);
+    setWorkoutForm({
+      type: 'Run',
+      amount: '',
+      unit: '',
+      duration: '',
+      notes: '',
+    });
+  };
+
+  const handleAddCustomType = async (newType: string) => {
+    if (!group || !groupId) return;
+
+    const currentTypes = group.workoutTypes || [];
+    if (!currentTypes.includes(newType)) {
+      const updatedTypes = [...currentTypes, newType];
+      const { error } = await handleAsync(async () => {
+        const res = await fetch('/api/groups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workoutTypes: updatedTypes }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update group');
+        }
+      }, 'updateGroup');
+      if (!error) {
+        setGroup({ ...group, workoutTypes: updatedTypes });
+        setWorkoutForm((prev) => ({ ...prev, type: newType }));
+      }
+    } else {
+      setWorkoutForm((prev) => ({ ...prev, type: newType }));
+    }
+  };
 
   const handleDeleteWorkout = (day: string, index: number) => {
-    const newPlan = { ...trainingPlan }
+    const newPlan = { ...trainingPlan };
     if (newPlan[day]) {
-      newPlan[day] = newPlan[day].filter((_, i) => i !== index)
+      newPlan[day] = newPlan[day].filter((_, i) => i !== index);
       if (newPlan[day].length === 0) {
-        delete newPlan[day]
+        delete newPlan[day];
       }
-      setTrainingPlan(newPlan)
+      setTrainingPlan(newPlan);
     }
-  }
+  };
 
   const handleDone = async () => {
-    if (!group) return
+    if (!group || !group._id) return;
 
-    const updatedGroup: Group = {
-      ...group,
-      trainingPlan,
+    const { error } = await handleAsync(async () => {
+      const res = await fetch('/api/groups', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupId: group._id?.toString() || group._id,
+          trainingPlan,
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update group');
+      }
+    }, 'handleDone');
+
+    if (error) {
+      toast.error(getErrorMessage(error));
+      return;
     }
 
-    await createGroup(updatedGroup)
-    setShowInviteModal(true)
-  }
+    toast.success('Training plan saved!');
+    setShowInviteModal(true);
+  };
 
   const handleGoToDashboard = () => {
-    router.push(`/dashboard/${groupId}`)
-  }
+    if (!group || !group._id) return;
+    const groupIdStr = group._id?.toString() || group._id;
+    router.push(`/dashboard/${groupIdStr}`);
+  };
 
   const handleCopyLink = () => {
-    if (!group) return
-    const inviteUrl = `${window.location.origin}/join/${group.inviteCode}`
-    navigator.clipboard.writeText(inviteUrl)
-    // You could add a toast notification here
-  }
+    if (!group) return;
+    const inviteUrl = `${window.location.origin}/join/${group.inviteCode}`;
+    navigator.clipboard.writeText(inviteUrl);
+    toast.success('Invite link copied!');
+  };
 
-  if (!group) {
+  if (loading || !group) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-gray-500">Loading...</div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
-        <h1 className="heading-lg text-gray-900 mb-6">Set Up Your Weekly Training Plan</h1>
+    <div className="min-h-screen bg-white">
+      <Navbar currentGroupId={groupId} />
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
+        <div className="max-w-5xl mx-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
+            Set Up Your Weekly Training Plan
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
+            Add workouts for each day of the week. This plan will repeat weekly.
+          </p>
 
-        <div className="space-y-6">
-          {DAYS.map((day) => (
-            <div key={day} className="border-b border-gray-200 pb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="heading-sm text-gray-900">{day}</h3>
-                {editingDay !== day && (
+          {/* Calendar Grid - Responsive: 2 cols mobile, 4 cols tablet, 7 cols desktop */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-8">
+            {DAYS.map((day) => {
+              const workouts = trainingPlan[day] || [];
+
+              return (
+                <div
+                  key={day}
+                  className="border-2 border-gray-200 rounded-xl p-2 sm:p-3 min-h-[180px] sm:min-h-[200px] flex flex-col bg-white hover:border-primary/30 transition-colors"
+                >
+                  {/* Day Header */}
+                  <div className="font-bold text-xs sm:text-sm mb-2 sm:mb-3 text-center text-gray-900">
+                    {day}
+                  </div>
+
+                  {/* Workouts List */}
+                  <div className="flex-1 space-y-1 sm:space-y-1.5 mb-2 min-h-0 overflow-y-auto max-h-[100px] sm:max-h-[120px]">
+                    {workouts.length > 0 ? (
+                      workouts.map((workout, index) => {
+                        const workoutText =
+                          typeof workout === 'string'
+                            ? workout
+                            : `${workout.type}${workout.amount ? ` ${workout.amount}${workout.unit || 'km'}` : ''}${workout.duration ? ` (${workout.duration}min)` : ''}`;
+                        return (
+                          <div
+                            key={index}
+                            className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-lg text-xs border border-primary/20 w-full"
+                          >
+                            <button
+                              type="button"
+                              className="flex-1 truncate cursor-pointer text-left"
+                              onClick={() => handleEditWorkout(day, index)}
+                              title="Click to edit"
+                            >
+                              {workoutText}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWorkout(day, index)}
+                              className="text-primary hover:text-primary-dark flex-shrink-0"
+                              type="button"
+                              aria-label={`Delete ${workoutText}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-[10px] sm:text-xs text-gray-400 text-center py-1 sm:py-2">
+                        No workouts
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Workout Button */}
                   <button
                     onClick={() => handleAddWorkout(day)}
-                    className="text-primary hover:text-primary-dark text-sm font-medium"
+                    className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 text-[10px] sm:text-xs text-gray-500 hover:text-primary hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center gap-0.5 sm:gap-1 border border-dashed border-gray-300 hover:border-primary"
+                    type="button"
                   >
-                    + Add workout
-                  </button>
-                )}
-              </div>
-
-              {editingDay === day && (
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={workoutInput}
-                    onChange={(e) => setWorkoutInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSaveWorkout()}
-                    placeholder="e.g., 5K easy run"
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveWorkout}
-                    className="px-4 py-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingDay(null)
-                      setWorkoutInput('')
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    ×
+                    <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <span className="hidden sm:inline">Add</span>
                   </button>
                 </div>
-              )}
+              );
+            })}
+          </div>
 
-              {trainingPlan[day] && trainingPlan[day].length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {trainingPlan[day].map((workout, index) => (
-                    <div
-                      key={index}
-                      className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20"
-                    >
-                      <span>{workout}</span>
-                      <button
-                        onClick={() => handleDeleteWorkout(day, index)}
-                        className="text-primary hover:text-primary-dark"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-8">
-          <button
-            onClick={handleDone}
-            className="btn-primary w-full text-lg"
-          >
-            Done →
-          </button>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+            <button
+              onClick={() => router.push(`/dashboard/${groupId}`)}
+              className="w-full sm:w-auto px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition-colors font-semibold text-sm sm:text-base"
+              type="button"
+            >
+              Skip for Now
+            </button>
+            <button
+              onClick={handleDone}
+              className="w-full sm:w-auto btn-primary px-6 py-3 text-base sm:text-lg"
+              type="button"
+            >
+              Done →
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Workout Edit Modal */}
+      {editingDay && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingIndex !== null ? 'Edit Workout' : 'Add Workout'} - {editingDay}
+              </h2>
+              <button
+                onClick={handleCancelEdit}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                type="button"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <BasicWorkoutFields
+                group={group}
+                type={workoutForm.type}
+                amount={workoutForm.amount}
+                unit={workoutForm.unit}
+                duration={workoutForm.duration}
+                onTypeChange={(type) => setWorkoutForm((prev) => ({ ...prev, type }))}
+                onAmountChange={(amount) => setWorkoutForm((prev) => ({ ...prev, amount }))}
+                onUnitChange={(unit) => setWorkoutForm((prev) => ({ ...prev, unit }))}
+                onDurationChange={(duration) => setWorkoutForm((prev) => ({ ...prev, duration }))}
+                showCustomType={true}
+                onCustomTypeAdd={handleAddCustomType}
+                errors={{}}
+                showDuration={true}
+              />
+
+              <div>
+                <label
+                  htmlFor="workout-notes"
+                  className="block text-sm font-semibold text-black mb-3"
+                >
+                  Notes (optional)
+                </label>
+                <textarea
+                  id="workout-notes"
+                  value={workoutForm.notes}
+                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g., Easy pace, Upper body focus"
+                  rows={3}
+                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-primary transition-colors resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition-colors font-semibold"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveWorkout}
+                  className="flex-1 btn-primary px-6 py-3"
+                  type="button"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showInviteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-            <h2 className="heading-md text-gray-900 mb-4">✓ Group Created!</h2>
-            <p className="body-md text-gray-700 mb-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">✓ Group Created!</h2>
+            <p className="text-sm sm:text-base text-gray-700 mb-4">
               Invite your crew with this link:
             </p>
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 mb-6">
               <input
                 type="text"
                 value={`${typeof window !== 'undefined' ? window.location.origin : ''}/join/${group.inviteCode}`}
                 readOnly
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                className="flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg bg-gray-50"
               />
               <button
                 onClick={handleCopyLink}
-                className="px-4 py-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors whitespace-nowrap"
+                className="px-4 py-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors whitespace-nowrap text-sm sm:text-base"
               >
                 Copy Link
               </button>
             </div>
             <button
               onClick={handleGoToDashboard}
-              className="btn-primary w-full text-lg"
+              className="btn-primary w-full text-base sm:text-lg"
             >
               Go to Dashboard →
             </button>
@@ -204,5 +450,5 @@ export default function SetupPlanPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

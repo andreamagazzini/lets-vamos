@@ -1,242 +1,251 @@
-import type { Group, Workout, PlannedWorkout, WeeklyPlan } from './db';
-
-export const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
-
-export function getDaysUntilGoal(goalDate: string): number {
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	const goal = new Date(goalDate);
-	goal.setHours(0, 0, 0, 0);
-	const diff = goal.getTime() - today.getTime();
-	return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
+import { DAYS, DEFAULT_WORKOUT_TYPES } from './constants';
+import {
+  formatDateForDisplay,
+  getAdjacentWeekKey,
+  getDaysUntilGoal,
+  getWeekKey,
+  getWeekRange,
+} from './date-utils';
+import type { Group, PlannedWorkout, WeeklyPlan, Workout } from './db';
 
 /**
- * Get the Monday date (start of week) for a given date
- * Returns date string in format "YYYY-MM-DD"
+ * Get workout types for a group (merges custom types with defaults)
  */
-export function getWeekKey(date: Date = new Date()): string {
-	const d = new Date(date);
-	const day = d.getDay();
-	const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-	const monday = new Date(d);
-	monday.setDate(diff);
-	monday.setHours(0, 0, 0, 0);
-	return monday.toISOString().split('T')[0];
+export function getWorkoutTypes(group: Group | null): string[] {
+  const defaultTypes = [...DEFAULT_WORKOUT_TYPES];
+
+  if (group?.workoutTypes && group.workoutTypes.length > 0) {
+    // Merge custom types with defaults, avoiding duplicates
+    const customTypes = group.workoutTypes.filter((t) => !(defaultTypes as string[]).includes(t));
+    return [...defaultTypes, ...customTypes];
+  }
+
+  return defaultTypes;
 }
+
+// Re-export for backward compatibility
+export { DAYS, getWeekKey, getWeekRange, getAdjacentWeekKey, getDaysUntilGoal };
 
 /**
  * Get the plan for a specific week
  * Checks weeklyPlanOverrides first, then falls back to default trainingPlan
  */
-export function getWeekPlan(
-	group: Group | null,
-	weekKey?: string,
-): WeeklyPlan {
-	if (!group?.trainingPlan) return {};
+export function getWeekPlan(group: Group | null, weekKey?: string): WeeklyPlan {
+  if (!group?.trainingPlan) return {};
 
-	const key = weekKey || getWeekKey();
+  const key = weekKey || getWeekKey();
 
-	// Check if there's an override for this week
-	if (group.weeklyPlanOverrides?.[key]) {
-		return group.weeklyPlanOverrides[key];
-	}
+  // Check if there's an override for this week
+  if (group.weeklyPlanOverrides?.[key]) {
+    return group.weeklyPlanOverrides[key];
+  }
 
-	// Return default plan
-	return group.trainingPlan;
-}
-
-/**
- * Get start (Monday) and end (Sunday) dates for a week key
- */
-export function getWeekRange(weekKey: string): { start: Date; end: Date } {
-	const start = new Date(weekKey);
-	start.setHours(0, 0, 0, 0);
-	const end = new Date(start);
-	end.setDate(start.getDate() + 6);
-	end.setHours(23, 59, 59, 999);
-	return { start, end };
-}
-
-/**
- * Get previous or next week key
- */
-export function getAdjacentWeekKey(
-	weekKey: string,
-	direction: 'prev' | 'next',
-): string {
-	const date = new Date(weekKey);
-	const days = direction === 'prev' ? -7 : 7;
-	date.setDate(date.getDate() + days);
-	return getWeekKey(date);
+  // Return default plan
+  return group.trainingPlan;
 }
 
 export function getCurrentWeekPlan(
-	group: Group | null,
+  group: Group | null
 ): Record<string, (string | PlannedWorkout)[]> {
-	const weekPlan = getWeekPlan(group);
-	const plan: Record<string, (string | PlannedWorkout)[]> = {};
-	DAYS.forEach((day) => {
-		plan[day] = weekPlan[day] || [];
-	});
-	return plan;
+  const weekPlan = getWeekPlan(group);
+  const plan: Record<string, (string | PlannedWorkout)[]> = {};
+  DAYS.forEach((day) => {
+    plan[day] = weekPlan[day] || [];
+  });
+  return plan;
 }
 
-export function isPlannedWorkout(
-	workout: string | PlannedWorkout,
-): workout is PlannedWorkout {
-	return typeof workout === 'object' && workout !== null && 'type' in workout;
+export function isPlannedWorkout(workout: string | PlannedWorkout): workout is PlannedWorkout {
+  return typeof workout === 'object' && workout !== null && 'type' in workout;
 }
 
 export function formatPlannedWorkout(
-	workout: string | PlannedWorkout,
-	settings?: { showDetails?: boolean },
+  workout: string | PlannedWorkout,
+  settings?: { showDetails?: boolean }
 ): string {
-	if (typeof workout === 'string') {
-		return workout;
-	}
+  if (typeof workout === 'string') {
+    return workout;
+  }
 
-	const parts: string[] = [workout.type];
-	if (workout.description) {
-		parts.push(workout.description);
-	}
-	if (settings?.showDetails) {
-		if (workout.duration) {
-			parts.push(`${workout.duration} min`);
-		}
-		if (workout.distance) {
-			parts.push(`${workout.distance} km`);
-		}
-	}
-	return parts.join(' - ');
+  const parts: string[] = [workout.type];
+  if (workout.description) {
+    parts.push(workout.description);
+  }
+  if (settings?.showDetails) {
+    if (workout.duration) {
+      parts.push(`${workout.duration} min`);
+    }
+    // Legacy field - use amount/unit instead
+    if ((workout as any).distance) {
+      parts.push(`${(workout as any).distance} km`);
+    }
+  }
+  return parts.join(' - ');
 }
 
 export function getRecentWorkouts(workouts: Workout[], days: number = 7): Workout[] {
-	const cutoff = new Date();
-	cutoff.setDate(cutoff.getDate() - days);
-	return workouts.filter((w) => new Date(w.date) >= cutoff);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return workouts.filter((w) => new Date(w.date) >= cutoff);
 }
 
-export function getWorkoutsByMemberId(
-	workouts: Workout[],
-	memberId: string,
-): Workout[] {
-	return workouts.filter((w) => w.memberId === memberId);
+// Get workouts by userId (Clerk user ID)
+export function getWorkoutsByUserId(workouts: Workout[], userId: string): Workout[] {
+  return workouts.filter((w) => w.userId === userId);
+}
+
+// Deprecated: Use getWorkoutsByUserId instead
+export function getWorkoutsByMemberId(workouts: Workout[], memberId: string): Workout[] {
+  return getWorkoutsByUserId(workouts, memberId);
 }
 
 export function getWeeklyPlanProgress(
-	group: Group | null,
-	memberId: string,
-	workouts: Workout[],
-	weekKey?: string,
-): { completed: number; total: number; percentage: number } {
-	if (!group?.trainingPlan) {
-		return { completed: 0, total: 0, percentage: 0 };
-	}
+  group: Group | null,
+  memberId: string,
+  workouts: Workout[],
+  weekKey?: string
+): {
+  completed: number;
+  total: number;
+  percentage: number;
+  breakdown?: Record<string, { planned: number; logged: number; unit: string }>;
+} {
+  if (!group?.trainingPlan) {
+    return { completed: 0, total: 0, percentage: 0 };
+  }
 
-	const weekPlanData = getWeekPlan(group, weekKey);
-	const weekPlan: Record<string, (string | PlannedWorkout)[]> = {};
-	DAYS.forEach((day) => {
-		weekPlan[day] = weekPlanData[day] || [];
-	});
-	const recentWorkouts = getRecentWorkouts(workouts);
-	const memberWorkouts = getWorkoutsByMemberId(recentWorkouts, memberId);
+  const weekPlanData = getWeekPlan(group, weekKey);
+  const weekPlan: Record<string, (string | PlannedWorkout)[]> = {};
+  DAYS.forEach((day) => {
+    weekPlan[day] = weekPlanData[day] || [];
+  });
 
-	// Count total planned workouts for the week
-	let totalPlanned = 0;
-	Object.values(weekPlan).forEach((dayWorkouts) => {
-		// Filter out "Rest" days from count
-		const nonRestWorkouts = dayWorkouts.filter((w) => {
-			if (typeof w === 'string') return true;
-			return w.type !== 'Rest';
-		});
-		totalPlanned += nonRestWorkouts.length;
-	});
+  // Get all workouts for the week (not just recent)
+  const currentWeekKey = weekKey || getWeekKey();
+  const { start: monday, end: sunday } = getWeekRange(currentWeekKey);
 
-	if (totalPlanned === 0) {
-		return { completed: 0, total: 0, percentage: 0 };
-	}
+  // Use local date strings for comparison to avoid timezone issues
+  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  const weekEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
 
-	// Count completed workouts (matching planned workouts)
-	const currentWeekKey = weekKey || getWeekKey();
-	const { start: monday } = getWeekRange(currentWeekKey);
+  const weekWorkouts = workouts.filter((w) => {
+    const workoutDate = new Date(w.date);
+    const workoutDateStr = `${workoutDate.getFullYear()}-${String(workoutDate.getMonth() + 1).padStart(2, '0')}-${String(workoutDate.getDate()).padStart(2, '0')}`;
+    return workoutDateStr >= weekStart && workoutDateStr <= weekEnd;
+  });
 
-	let completed = 0;
-	DAYS.forEach((day, index) => {
-		const date = new Date(monday);
-		date.setDate(monday.getDate() + index);
-		const dateKey = date.toISOString().split('T')[0];
+  const memberWorkouts = getWorkoutsByMemberId(weekWorkouts, memberId);
 
-		// Check if member has logged a workout on this day
-		const hasWorkout = memberWorkouts.some((w) => {
-			const workoutDate = new Date(w.date).toISOString().split('T')[0];
-			return workoutDate === dateKey;
-		});
+  // Check if any planned workout has an amount
+  const hasAmountsInPlan = Object.values(weekPlan).some((dayWorkouts) =>
+    dayWorkouts.some((w) => typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined)
+  );
 
-		// If there's a planned workout for this day, check if it's completed
-		if (weekPlan[day] && weekPlan[day].length > 0) {
-			const dayWorkouts = weekPlan[day];
-			// Filter out "Rest" days and count matches
-			const nonRestWorkouts = dayWorkouts.filter((w) => {
-				if (typeof w === 'string') return true;
-				return w.type !== 'Rest';
-			});
+  // Calculate totals by type and unit
+  const plannedByType: Record<string, { amount: number; unit: string }> = {};
+  const loggedByType: Record<string, { amount: number; unit: string }> = {};
 
-			if (hasWorkout && nonRestWorkouts.length > 0) {
-				// Try to match workout type if structured
-				const matchingWorkouts = nonRestWorkouts.filter((planned) => {
-					if (typeof planned === 'string') {
-						// For string plans, any workout on that day counts
-						return true;
-					}
-					// For structured plans, try to match type
-					return memberWorkouts.some((logged) => {
-						const loggedDate = new Date(logged.date)
-							.toISOString()
-							.split('T')[0];
-						return loggedDate === dateKey && logged.type === planned.type;
-					});
-				});
-				completed += matchingWorkouts.length;
-			}
-		}
-	});
+  if (hasAmountsInPlan) {
+    // Sum up planned amounts by type and unit (only count workouts with amounts)
+    Object.values(weekPlan).forEach((dayWorkouts) => {
+      dayWorkouts.forEach((w) => {
+        if (typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined) {
+          const key = `${w.type}_${w.unit || 'km'}`;
+          if (!plannedByType[key]) {
+            plannedByType[key] = { amount: 0, unit: w.unit || 'km' };
+          }
+          plannedByType[key].amount += w.amount;
+        }
+      });
+    });
 
-	const percentage =
-		totalPlanned > 0 ? Math.round((completed / totalPlanned) * 100) : 0;
+    // Sum up logged amounts by type and unit
+    memberWorkouts.forEach((w) => {
+      const loggedAmount = w.amount || w.distance; // Support legacy distance
+      const loggedUnit = w.unit || (w.type === 'Swim' ? 'm' : 'km');
 
-	return { completed, total: totalPlanned, percentage };
+      if (loggedAmount !== undefined) {
+        const key = `${w.type}_${loggedUnit}`;
+        if (!loggedByType[key]) {
+          loggedByType[key] = { amount: 0, unit: loggedUnit };
+        }
+        loggedByType[key].amount += loggedAmount;
+      }
+    });
+
+    // Calculate totals and percentage - only count logged amounts that match planned types
+    let totalPlanned = 0;
+    let totalLoggedMatched = 0; // Only count amounts that match planned types
+    const breakdown: Record<string, { planned: number; logged: number; unit: string }> = {};
+
+    // First, sum all planned amounts and initialize breakdown
+    Object.entries(plannedByType).forEach(([key, data]) => {
+      totalPlanned += data.amount;
+      const type = key.split('_')[0];
+      if (!breakdown[type]) {
+        breakdown[type] = { planned: 0, logged: 0, unit: data.unit };
+      }
+      breakdown[type].planned += data.amount;
+    });
+
+    // Now, only count logged amounts that match planned types (and cap at planned amount)
+    Object.entries(plannedByType).forEach(([key, plannedData]) => {
+      const type = key.split('_')[0];
+      const unit = plannedData.unit;
+
+      // Find logged amounts for this type and unit
+      const loggedKey = `${type}_${unit}`;
+      const loggedData = loggedByType[loggedKey];
+
+      if (loggedData) {
+        // Only count up to the planned amount (cap at 100% per type)
+        const matchedAmount = Math.min(loggedData.amount, plannedData.amount);
+        totalLoggedMatched += matchedAmount;
+        breakdown[type].logged = matchedAmount;
+      }
+    });
+
+    if (totalPlanned === 0) {
+      return { completed: 0, total: 0, percentage: 0 };
+    }
+
+    const percentage = Math.round((totalLoggedMatched / totalPlanned) * 100);
+
+    return {
+      completed: Math.round(totalLoggedMatched),
+      total: Math.round(totalPlanned),
+      percentage,
+      breakdown,
+    };
+  } else {
+    // No amounts in plan, count workouts instead
+    const plannedCount = Object.values(weekPlan)
+      .flat()
+      .filter((w) => typeof w === 'string' || (typeof w === 'object' && w.type !== 'Rest')).length;
+    const loggedCount = memberWorkouts.length;
+
+    if (plannedCount === 0) {
+      return { completed: 0, total: 0, percentage: 0 };
+    }
+
+    const percentage = Math.round((loggedCount / plannedCount) * 100);
+    return {
+      completed: loggedCount,
+      total: plannedCount,
+      percentage,
+    };
+  }
 }
 
+// Re-export formatDateForDisplay as formatDate for backward compatibility
 export function formatDate(dateString: string): string {
-	const date = new Date(dateString);
-	const today = new Date();
-	const yesterday = new Date(today);
-	yesterday.setDate(yesterday.getDate() - 1);
-
-	if (date.toDateString() === today.toDateString()) {
-		return 'Today';
-	} else if (date.toDateString() === yesterday.toDateString()) {
-		return 'Yesterday';
-	} else {
-		return date.toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-		});
-	}
+  return formatDateForDisplay(dateString);
 }
 
 export function getInviteUrl(group: Group | null): string {
-	if (!group) return '';
-	return `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${group.inviteCode}`;
+  if (!group) return '';
+  return `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${group.inviteCode}`;
 }
 
-export function getDayIndex(dayOfWeek: number): number {
-	return dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-}
-
-export function isToday(dayIndex: number): boolean {
-	const today = new Date();
-	const dayOfWeek = today.getDay();
-	return dayIndex === getDayIndex(dayOfWeek);
-}
+// Re-export from date-utils for backward compatibility
+export { getDayIndex, isTodayDay as isToday } from './date-utils';

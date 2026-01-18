@@ -1,266 +1,215 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-	Footprints,
-	Bike,
-	Waves,
-	Dumbbell,
-	Activity,
-	Trash2,
-	Clock,
-	MapPin,
-} from "lucide-react";
-import type { PlannedWorkout } from "@/lib/db";
+import { Activity, Bike, Dumbbell, Footprints, Waves, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { Group, PlannedWorkout } from '@/lib/db';
+import BasicWorkoutFields from './BasicWorkoutFields';
 
 interface PlannedWorkoutEditorProps {
-	workout: string | PlannedWorkout;
-	onUpdate: (workout: string | PlannedWorkout) => void;
-	onDelete: () => void;
+  workout: string | PlannedWorkout;
+  group: Group | null;
+  onUpdate: (workout: string | PlannedWorkout) => void;
+  onDelete: () => void;
+  onUpdateGroup?: (updates: Partial<Group>) => void;
 }
 
-const WORKOUT_TYPES: PlannedWorkout["type"][] = [
-	"Run",
-	"Bike",
-	"Swim",
-	"Strength",
-	"Rest",
-	"Other",
-];
-
 function getWorkoutIcon(type: string) {
-	switch (type) {
-		case "Run":
-			return <Footprints className="w-4 h-4" />;
-		case "Bike":
-			return <Bike className="w-4 h-4" />;
-		case "Swim":
-			return <Waves className="w-4 h-4" />;
-		case "Strength":
-			return <Dumbbell className="w-4 h-4" />;
-		default:
-			return <Activity className="w-4 h-4" />;
-	}
+  switch (type) {
+    case 'Run':
+      return <Footprints className="w-4 h-4" />;
+    case 'Bike':
+      return <Bike className="w-4 h-4" />;
+    case 'Swim':
+      return <Waves className="w-4 h-4" />;
+    case 'Strength':
+      return <Dumbbell className="w-4 h-4" />;
+    default:
+      return <Activity className="w-4 h-4" />;
+  }
 }
 
 export default function PlannedWorkoutEditor({
-	workout,
-	onUpdate,
-	onDelete,
+  workout,
+  group,
+  onUpdate,
+  onDelete,
+  onUpdateGroup,
 }: PlannedWorkoutEditorProps) {
-	const isString = typeof workout === "string";
-	const isEmpty = workout === "" || (isString && workout.trim() === "");
-	const [isEditing, setIsEditing] = useState(isEmpty);
+  const isString = typeof workout === 'string';
+  const isEmpty = workout === '' || (isString && workout.trim() === '');
+  const [isEditing, setIsEditing] = useState(isEmpty);
 
-	const [type, setType] = useState<PlannedWorkout["type"]>(
-		isString ? "Other" : workout.type,
-	);
-	const [description, setDescription] = useState(
-		isString ? workout : workout.description || "",
-	);
-	const [duration, setDuration] = useState(
-		isString ? "" : workout.duration?.toString() || "",
-	);
-	const [distance, setDistance] = useState(
-		isString ? "" : workout.distance?.toString() || "",
-	);
-	const [notes, setNotes] = useState(
-		isString ? "" : workout.notes || "",
-	);
+  const [type, setType] = useState<string>(isString ? 'Run' : workout.type);
+  const [duration, setDuration] = useState(isString ? '' : workout.duration?.toString() || '');
+  const [amount, setAmount] = useState(isString ? '' : workout.amount?.toString() || '');
+  const [unit, setUnit] = useState(isString ? '' : workout.unit || '');
+  // Migrate description to notes for backward compatibility
+  const [notes, setNotes] = useState(
+    isString ? workout : workout.notes || (workout as any).description || ''
+  );
 
-	const handleSave = () => {
-		if (type === "Rest") {
-			onUpdate({ type: "Rest" });
-		} else if (description.trim() || duration || distance) {
-			const plannedWorkout: PlannedWorkout = {
-				type,
-				description: description.trim() || undefined,
-				duration: duration ? parseInt(duration) : undefined,
-				distance: distance ? parseFloat(distance) : undefined,
-				notes: notes.trim() || undefined,
-			};
-			onUpdate(plannedWorkout);
-		} else {
-			// Fallback to string if no structured data
-			onUpdate(description.trim() || "Workout");
-		}
-		setIsEditing(false);
-	};
+  // Update state when workout prop changes (important for custom types)
+  useEffect(() => {
+    if (!isString && workout.type) {
+      setType(workout.type);
+    }
+  }, [workout, isString]);
 
-	const handleCancel = () => {
-		// Reset to original values
-		if (typeof workout === "string") {
-			setDescription(workout);
-			setType("Other");
-		} else {
-			setType(workout.type);
-			setDescription(workout.description || "");
-			setDuration(workout.duration?.toString() || "");
-			setDistance(workout.distance?.toString() || "");
-			setNotes(workout.notes || "");
-		}
-		setIsEditing(false);
-	};
+  const handleSave = () => {
+    if (type === 'Rest') {
+      onUpdate({ type: 'Rest' });
+    } else if (notes.trim() || duration || amount) {
+      const plannedWorkout: PlannedWorkout = {
+        type,
+        duration: duration ? parseInt(duration, 10) : undefined,
+        amount: amount ? parseFloat(amount) : undefined,
+        unit: unit || undefined,
+        notes: notes.trim() || undefined,
+      };
+      onUpdate(plannedWorkout);
+    } else {
+      // Fallback to string if no structured data
+      onUpdate(notes.trim() || 'Workout');
+    }
+    setIsEditing(false);
+  };
 
-	if (!isEditing) {
-		return (
-			<div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-				<div className="flex items-center gap-2 flex-1">
-					{getWorkoutIcon(type)}
-					<span className="text-sm font-medium text-gray-700">
-						{typeof workout === "string"
-							? workout
-							: workout.type === "Rest"
-								? "Rest Day"
-								: workout.description || workout.type}
-					</span>
-					{typeof workout === "object" && workout.duration && (
-						<span className="text-xs text-gray-500">
-							{workout.duration} min
-						</span>
-					)}
-					{typeof workout === "object" && workout.distance && (
-						<span className="text-xs text-gray-500">
-							{workout.distance} km
-						</span>
-					)}
-				</div>
-				<div className="flex items-center gap-2">
-					<button
-						type="button"
-						onClick={() => setIsEditing(true)}
-						className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/5 rounded transition-colors"
-						aria-label="Edit workout"
-					>
-						<Activity className="w-4 h-4" />
-					</button>
-					<button
-						type="button"
-						onClick={onDelete}
-						className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-						aria-label="Delete workout"
-					>
-						<Trash2 className="w-4 h-4" />
-					</button>
-				</div>
-			</div>
-		);
-	}
+  const handleCancel = () => {
+    // Reset to original values
+    if (typeof workout === 'string') {
+      setNotes(workout);
+      setType('Run');
+      setAmount('');
+      setUnit('');
+    } else {
+      setType(workout.type);
+      // Migrate description to notes for backward compatibility
+      setNotes(workout.notes || (workout as any).description || '');
+      setDuration(workout.duration?.toString() || '');
+      setAmount(workout.amount?.toString() || '');
+      setUnit(workout.unit || '');
+    }
+    setIsEditing(false);
+  };
 
-	return (
-		<div className="p-4 bg-white border-2 border-primary rounded-xl space-y-4">
-			<div className="flex items-center justify-between">
-				<span className="text-sm font-semibold text-gray-700">
-					Workout Type
-				</span>
-				<button
-					type="button"
-					onClick={handleCancel}
-					className="text-sm text-gray-500 hover:text-gray-700"
-				>
-					Cancel
-				</button>
-			</div>
+  if (!isEditing) {
+    const workoutType = typeof workout === 'object' ? workout.type : type;
+    const workoutTypeName =
+      typeof workout === 'string' ? workout : workout.type === 'Rest' ? 'Rest Day' : workout.type;
 
-			<select
-				id="workout-type"
-				value={type}
-				onChange={(e) =>
-					setType(e.target.value as PlannedWorkout["type"])
-				}
-				className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary transition-colors"
-			>
-				{WORKOUT_TYPES.map((t) => (
-					<option key={t} value={t}>
-						{t}
-					</option>
-				))}
-			</select>
+    return (
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        className="w-full text-left p-2 bg-white rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-colors"
+      >
+        <div className="flex items-start">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              {getWorkoutIcon(workoutType)}
+              <span className="text-sm font-medium text-gray-700">{workoutTypeName}</span>
+            </div>
+            {typeof workout === 'object' && workout.amount && (
+              <div className="text-xs text-gray-500 ml-6">
+                {workout.amount} {workout.unit || 'km'}
+              </div>
+            )}
+            {/* Backward compatibility: show distance if amount not available */}
+            {typeof workout === 'object' && !workout.amount && (workout as any).distance && (
+              <div className="text-xs text-gray-500 ml-6">{(workout as any).distance} km</div>
+            )}
+            {typeof workout === 'object' && workout.notes && (
+              <div className="text-xs text-gray-500 ml-6 mt-0.5">{workout.notes}</div>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  }
 
-			{type !== "Rest" && (
-				<>
-					<div>
-						<label
-							htmlFor="workout-description"
-							className="block text-xs font-medium text-gray-600 mb-1"
-						>
-							Description
-						</label>
-						<input
-							id="workout-description"
-							type="text"
-							value={description}
-							onChange={(e) => setDescription(e.target.value)}
-							placeholder="e.g., 5K easy run, Upper body strength"
-							className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
-						/>
-					</div>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Edit Workout</h3>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-					<div className="grid grid-cols-2 gap-3">
-						<div>
-							<label
-								htmlFor="workout-duration"
-								className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1"
-							>
-								<Clock className="w-3 h-3" />
-								Duration (min)
-							</label>
-							<input
-								id="workout-duration"
-								type="number"
-								value={duration}
-								onChange={(e) => setDuration(e.target.value)}
-								placeholder="45"
-								className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
-							/>
-						</div>
+        <div className="space-y-4">
+          {type !== 'Rest' && (
+            <>
+              <BasicWorkoutFields
+                group={group}
+                type={type}
+                amount={amount}
+                unit={unit}
+                duration={duration}
+                onTypeChange={setType}
+                onAmountChange={setAmount}
+                onUnitChange={setUnit}
+                onDurationChange={setDuration}
+                showCustomType={true}
+                onCustomTypeAdd={async (newType) => {
+                  // Add custom type to group
+                  if (group && onUpdateGroup) {
+                    const currentTypes = group.workoutTypes || [];
+                    if (!currentTypes.includes(newType)) {
+                      onUpdateGroup({
+                        workoutTypes: [...currentTypes, newType],
+                      });
+                    }
+                  }
+                  // Set the new type
+                  setType(newType);
+                }}
+                errors={{}}
+                showDuration={true}
+              />
 
-						<div>
-							<label
-								htmlFor="workout-distance"
-								className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1"
-							>
-								<MapPin className="w-3 h-3" />
-								Distance (km)
-							</label>
-							<input
-								id="workout-distance"
-								type="number"
-								step="0.1"
-								value={distance}
-								onChange={(e) => setDistance(e.target.value)}
-								placeholder="8.5"
-								className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
-							/>
-						</div>
-					</div>
+              <div>
+                <label
+                  htmlFor="workout-notes"
+                  className="block text-xs font-medium text-gray-600 mb-1"
+                >
+                  Notes (optional)
+                </label>
+                <textarea
+                  id="workout-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g., Easy pace, Upper body focus"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+            </>
+          )}
 
-					<div>
-						<label
-							htmlFor="workout-notes"
-							className="block text-xs font-medium text-gray-600 mb-1"
-						>
-							Notes (optional)
-						</label>
-						<textarea
-							id="workout-notes"
-							value={notes}
-							onChange={(e) => setNotes(e.target.value)}
-							placeholder="Additional notes..."
-							rows={2}
-							className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary resize-none"
-						/>
-					</div>
-				</>
-			)}
-
-			<button
-				type="button"
-				onClick={handleSave}
-				className="w-full px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors"
-			>
-				Save Workout
-			</button>
-		</div>
-	);
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

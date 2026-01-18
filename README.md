@@ -1,21 +1,16 @@
-# Let's Vamos (TrainTogether)
+# Let's Vamos
 
 A shared group dashboard for small training groups (2-5 people) to track workouts and stay accountable for a shared fitness goal (marathon, Hyrox, triathlon, etc).
 
 ## 🎯 Current Status
 
-**Version:** 1.0.0 (Prototype)
+**Version:** 2.0.0 (Production Ready)
 
-This is a fully functional prototype using:
-- **IndexedDB** for local data storage (client-side only)
-- **Mock authentication** (no real auth service)
-- **No backend** - all data stored in browser
-
-### ⚠️ Migration Notes
-
-- All IndexedDB operations are marked with `TODO` comments for future migration to a real database
-- Authentication is mocked and needs to be replaced with a real auth service
-- See `lib/db.ts` for all database operations that need API integration
+Built with:
+- **Clerk** for authentication
+- **MongoDB** for data storage (with abstraction layer for easy DB switching)
+- **Next.js 14** with API routes
+- **TypeScript** + **Zod** for type safety
 
 ## ✨ Features
 
@@ -33,54 +28,148 @@ This is a fully functional prototype using:
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm (package manager)
+- Clerk account ([clerk.com](https://clerk.com))
+- MongoDB (Atlas cloud or local)
 
 ### Installation
 
-1. Install dependencies:
+1. **Clone and install dependencies:**
 ```bash
 pnpm install
 ```
 
-2. Run the development server:
+2. **Set up environment variables:**
+   - Copy `.env.example` to `.env.local`
+   - Add your Clerk keys from [dashboard.clerk.com](https://dashboard.clerk.com)
+   - Add your MongoDB connection string
+
+3. **Set up MongoDB indexes:**
+```bash
+pnpm run setup:indexes
+```
+
+4. **Run the development server:**
 ```bash
 pnpm dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. **Open [http://localhost:3000](http://localhost:3000) in your browser**
 
-### Quick Test Login
+### Environment Variables
 
-The app includes quick test login buttons on the home page:
-- **Test User 1**: `test1@example.com`
-- **Test User 2**: `test2@example.com`
-
-No password required - click the buttons to log in instantly for testing.
+Required variables (see `.env.example`):
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - From Clerk dashboard
+- `CLERK_SECRET_KEY` - From Clerk dashboard
+- `MONGODB_URI` - MongoDB connection string
 
 ## 🛠 Tech Stack
 
 - **Next.js 14** - React framework with App Router
 - **TypeScript** - Type safety
+- **Clerk** - Authentication
+- **MongoDB** - Data storage (with abstraction layer)
+- **Zod** - Runtime validation and type inference
 - **Tailwind CSS** - Utility-first styling
-- **IndexedDB (via idb)** - Local browser storage (prototype only)
-- **React Hooks** - State management
+- **Biome** - Fast linting and formatting
 
 ## 📁 Project Structure
 
 ```
 /app
+  /api               - API routes (protected by Clerk)
   /create-group      - Group creation flow
   /dashboard         - Main dashboard with progress tracking
   /setup-plan        - Weekly training plan setup
   /join              - Join group with invite code
-/components
-  LogWorkoutModal.tsx - Workout logging modal
 /lib
-  db.ts              - IndexedDB operations (TODO: migrate to API)
-  auth.ts            - Mock authentication (TODO: real auth)
-  db-debug.ts        - Debug utilities
+  /db                - Database abstraction layer
+  /adapters          - Database-specific implementations
+    /mongodb         - MongoDB adapter
+  /schemas           - Zod schemas and TypeScript types
+/components          - React components
+/hooks               - Custom React hooks
 ```
+
+## 🏗 Architecture
+
+### Data Storage Strategy
+
+- **Clerk**: User authentication
+- **MongoDB**: 
+  - **Groups Collection**: Training plans, weekly overrides, settings
+  - **Members Collection**: Group membership and roles
+  - **Workouts Collection**: All workout logs
+
+### Database Abstraction Layer
+
+The codebase uses a database abstraction layer (`lib/db/`) that makes it easy to switch databases:
+
+```
+lib/
+  db/
+    index.ts          # Database interface/abstraction
+  adapters/
+    mongodb/          # MongoDB-specific implementation
+      index.ts
+      groups.ts
+      members.ts
+      workouts.ts
+```
+
+**To switch databases:**
+1. Create a new adapter in `lib/adapters/[new-db]/`
+2. Implement the `DatabaseAdapter` interface
+3. Update `lib/db/index.ts` to use the new adapter
+4. No changes needed in API routes or business logic
+
+### Security
+
+- All API routes protected by Clerk middleware
+- Group membership verified on every request
+- Data queries filtered by `groupId` and user membership
+- Input validation with Zod schemas
+- Type-safe operations with TypeScript
+- Soft deletes for data recovery
+
+### Data Models
+
+See `lib/schemas/` for Zod schemas and TypeScript types:
+- `Group.ts` - Group schema with training plans
+- `Member.ts` - Member schema with roles (admin/member)
+- `Workout.ts` - Workout schema with all workout types
+
+## 📚 API Documentation
+
+Interactive API documentation is available at `/api-docs`. The documentation is generated from the OpenAPI 3.1 specification.
+
+- **Interactive Docs**: Visit `/api-docs` in your browser
+- **OpenAPI Spec**: Available at `/api/openapi` (JSON format)
+
+### API Endpoints
+
+#### Groups
+- `GET /api/groups` - Get groups for authenticated user
+- `POST /api/groups` - Create a new group
+- `PATCH /api/groups` - Update a group (admin only)
+- `GET /api/groups/{groupId}` - Get a specific group
+- `GET /api/groups/invite/{inviteCode}` - Get group by invite code (public)
+
+#### Members
+- `GET /api/members?groupId=xxx` - Get members of a group
+- `POST /api/members` - Join a group (create member)
+
+#### Workouts
+- `GET /api/workouts?groupId=xxx` - Get workouts for a group
+- `POST /api/workouts` - Create a new workout
+- `GET /api/workouts/{workoutId}` - Get a specific workout
+- `PATCH /api/workouts/{workoutId}` - Update a workout
+- `DELETE /api/workouts/{workoutId}` - Delete a workout
+
+### Adding New Endpoints
+
+When adding a new API endpoint, update the OpenAPI spec in `app/api/openapi/route.ts` manually. This ensures accurate, helpful documentation.
 
 ## 🔄 User Flows
 
@@ -92,29 +181,114 @@ No password required - click the buttons to log in instantly for testing.
 
 ## 🎨 Design
 
-- **Color Palette**: Dark blue (#1e3a8a) primary, light blue (#60a5fa) accents
+- **Color Palette**: 
+  - Primary: `#02182c` (Dark Navy)
+  - Accent: `#2888fb` (Bright Blue)
+  - Background: `#fcfcfa` (Off White)
 - **Typography**: Inter font family, bold headings
 - **Style**: Modern, sporty, clean design inspired by WHOOP
 
+## 🧪 Testing
+
+This project uses [Playwright](https://playwright.dev) for End-to-End (E2E) testing.
+
+### Quick Start
+
+```bash
+# Install Playwright browsers (first time only)
+pnpm exec playwright install
+
+# Run all tests
+pnpm test
+
+# Run tests with UI mode (interactive)
+pnpm test:ui
+
+# Run tests in headed mode (see browser)
+pnpm test:headed
+
+# View test report
+pnpm test:report
+```
+
+### Test Structure
+
+```
+e2e/
+  ├── example.spec.ts          # Basic examples
+  ├── auth-flow.spec.ts        # Authentication tests
+  ├── dashboard.spec.ts        # Dashboard tests
+  └── test-helpers.ts          # Reusable test utilities
+```
+
+Screenshots are automatically captured on test failures and saved to `test-results/`.
+
+## 🔧 Development
+
+### Code Quality
+
+This project uses **Biome** for linting and formatting (faster than ESLint).
+
+```bash
+# Check everything (lint + format, read-only)
+pnpm check
+
+# Fix everything automatically (lint + format)
+pnpm check:fix
+
+# Format code only
+pnpm format
+
+# Lint only
+pnpm lint
+```
+
+**Recommended workflow:**
+- Before committing: `pnpm check:fix` (fixes everything)
+- In CI/CD: `pnpm check` (just checks, fails if issues found)
+
+### MongoDB Indexes
+
+After setting up MongoDB, run the index setup script:
+
+```bash
+pnpm run setup:indexes
+```
+
+This creates indexes for:
+- Groups: `inviteCode` (unique), `createdBy`, `deletedAt`
+- Members: `groupId + userId` (unique), `groupId`, `userId`, `groupId + role`
+- Workouts: `groupId + date`, `groupId + userId + date`, `userId + date`
+
+### Scripts
+
+```bash
+pnpm dev              # Start development server
+pnpm build            # Build for production
+pnpm start            # Start production server
+pnpm test             # Run E2E tests
+pnpm check:fix        # Fix linting and formatting
+pnpm setup:indexes    # Set up MongoDB indexes
+```
+
 ## 📝 Development Notes
 
-### Current Limitations (Prototype)
+### Database Migration
 
-- All data is stored locally in browser's IndexedDB
-- No backend API - fully client-side
-- Mock authentication (no real magic links)
-- Data is not synced across devices
-- No user accounts or password recovery
+The codebase migrated from IndexedDB to MongoDB. All data is now stored in MongoDB with:
+- Soft delete support (`deletedAt` field)
+- Proper indexes for performance
+- Member-based access control (replacing Clerk organizations)
 
 ### Future Improvements
 
-- [ ] Migrate IndexedDB to PostgreSQL/MongoDB backend
-- [ ] Implement real authentication (Auth0, Clerk, or Supabase)
-- [ ] Add API endpoints for all database operations
-- [ ] Add data synchronization across devices
 - [ ] Add email notifications
 - [ ] Add workout statistics and analytics
 - [ ] Add mobile app (React Native)
+- [ ] Add caching layer (Redis)
+- [ ] Add rate limiting
+- [ ] Add workout templates
+- [ ] Add social features (comments, reactions)
 
 ## 📄 License
 
