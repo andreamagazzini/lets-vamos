@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 export const IntervalSchema = z.object({
-  type: z.enum(['warmup', 'work', 'recovery']),
+  type: z.enum(['warmup', 'work', 'cooldown', 'recovery']),
   distance: z.number().optional(),
   time: z.number().optional(), // seconds
   pace: z.number().optional(),
   avgHeartRate: z.number().optional(),
+  note: z.string().optional(),
 });
 
 export const WorkoutSetSchema = z.object({

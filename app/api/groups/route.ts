@@ -45,11 +45,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, goalType, goalDate, inviteCode } = body;
+    const { name, emoji, goalType, goalDate, inviteCode } = body;
 
     // Validate input
     const validated: CreateGroupInput = CreateGroupSchema.parse({
       name,
+      emoji: emoji || undefined,
       goalType,
       goalDate,
       inviteCode,

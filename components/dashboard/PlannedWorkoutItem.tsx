@@ -134,10 +134,25 @@ export default function PlannedWorkoutItem({
   }
 
   if (settings.displayStyle === 'expanded') {
-    const displayText =
+    let displayText =
       plannedWorkout.type === 'Rest'
         ? 'Rest Day'
         : plannedWorkout.notes || (plannedWorkout as any).description || plannedWorkout.type;
+    
+    // Add intervals/exercises info if available
+    if (plannedWorkout.type !== 'Rest') {
+      const parts: string[] = [];
+      if (plannedWorkout.intervals && plannedWorkout.intervals.length > 0) {
+        parts.push(`${plannedWorkout.intervals.length} interval${plannedWorkout.intervals.length > 1 ? 's' : ''}`);
+      }
+      if (plannedWorkout.exercises && plannedWorkout.exercises.length > 0) {
+        parts.push(`${plannedWorkout.exercises.length} exercise${plannedWorkout.exercises.length > 1 ? 's' : ''}`);
+      }
+      if (parts.length > 0) {
+        displayText += ` • ${parts.join(', ')}`;
+      }
+    }
+    
     return (
       <div
         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border ${bgColor} ${borderColor} ${textColor}`}

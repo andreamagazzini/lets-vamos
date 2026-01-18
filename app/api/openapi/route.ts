@@ -216,11 +216,12 @@ export async function GET() {
         Interval: {
           type: 'object',
           properties: {
-            type: { type: 'string', enum: ['warmup', 'work', 'recovery'] },
+            type: { type: 'string', enum: ['warmup', 'work', 'cooldown', 'recovery'] },
             distance: { type: 'number' },
             time: { type: 'number', description: 'seconds' },
             pace: { type: 'number' },
             avgHeartRate: { type: 'number' },
+            note: { type: 'string' },
           },
         },
         Exercise: {

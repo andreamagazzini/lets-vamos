@@ -2,8 +2,11 @@
 
 import { Activity, Bike, Dumbbell, Footprints, Waves, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { Group, PlannedWorkout } from '@/lib/db';
+import { getWorkoutTypes } from '@/lib/dashboard-utils';
+import type { Exercise, Group, Interval, PlannedWorkout } from '@/lib/db';
 import BasicWorkoutFields from './BasicWorkoutFields';
+import IntervalsSection from './IntervalsSection';
+import StrengthTrainingSection from './StrengthTrainingSection';
 
 interface PlannedWorkoutEditorProps {
   workout: string | PlannedWorkout;
@@ -47,24 +50,36 @@ export default function PlannedWorkoutEditor({
   const [notes, setNotes] = useState(
     isString ? workout : workout.notes || (workout as any).description || ''
   );
+  const [intervals, setIntervals] = useState<Interval[]>(
+    isString ? [] : workout.intervals || []
+  );
+  const [exercises, setExercises] = useState<Exercise[]>(
+    isString ? [] : workout.exercises || []
+  );
+  const [intervalsExpanded, setIntervalsExpanded] = useState(false);
 
   // Update state when workout prop changes (important for custom types)
   useEffect(() => {
     if (!isString && workout.type) {
       setType(workout.type);
+      setIntervals(workout.intervals || []);
+      setExercises(workout.exercises || []);
+      setIntervalsExpanded((workout.intervals?.length || 0) > 0);
     }
   }, [workout, isString]);
 
   const handleSave = () => {
     if (type === 'Rest') {
       onUpdate({ type: 'Rest' });
-    } else if (notes.trim() || duration || amount) {
+    } else if (notes.trim() || duration || amount || intervals.length > 0 || exercises.length > 0) {
       const plannedWorkout: PlannedWorkout = {
         type,
         duration: duration ? parseInt(duration, 10) : undefined,
         amount: amount ? parseFloat(amount) : undefined,
         unit: unit || undefined,
         notes: notes.trim() || undefined,
+        intervals: intervals.length > 0 ? intervals : undefined,
+        exercises: exercises.length > 0 ? exercises : undefined,
       };
       onUpdate(plannedWorkout);
     } else {
@@ -81,6 +96,8 @@ export default function PlannedWorkoutEditor({
       setType('Run');
       setAmount('');
       setUnit('');
+      setIntervals([]);
+      setExercises([]);
     } else {
       setType(workout.type);
       // Migrate description to notes for backward compatibility
@@ -88,7 +105,10 @@ export default function PlannedWorkoutEditor({
       setDuration(workout.duration?.toString() || '');
       setAmount(workout.amount?.toString() || '');
       setUnit(workout.unit || '');
+      setIntervals(workout.intervals || []);
+      setExercises(workout.exercises || []);
     }
+    setIntervalsExpanded(false);
     setIsEditing(false);
   };
 
@@ -129,7 +149,7 @@ export default function PlannedWorkoutEditor({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Edit Workout</h3>
           <button
@@ -145,34 +165,187 @@ export default function PlannedWorkoutEditor({
         <div className="space-y-4">
           {type !== 'Rest' && (
             <>
-              <BasicWorkoutFields
-                group={group}
-                type={type}
-                amount={amount}
-                unit={unit}
-                duration={duration}
-                onTypeChange={setType}
-                onAmountChange={setAmount}
-                onUnitChange={setUnit}
-                onDurationChange={setDuration}
-                showCustomType={true}
-                onCustomTypeAdd={async (newType) => {
-                  // Add custom type to group
-                  if (group && onUpdateGroup) {
-                    const currentTypes = group.workoutTypes || [];
-                    if (!currentTypes.includes(newType)) {
-                      onUpdateGroup({
-                        workoutTypes: [...currentTypes, newType],
-                      });
+              {/* Workout Type Selector */}
+              <div>
+                <label htmlFor="workout-type" className="block text-xs font-medium text-gray-600 mb-1">
+                  Workout Type
+                </label>
+                <select
+                  id="workout-type"
+                  value={type}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    if (newType === '__custom__') {
+                      const customType = prompt('Enter custom workout type (max 30 characters):');
+                      if (customType && customType.trim() && customType.length <= 30) {
+                        if (group && onUpdateGroup) {
+                          const currentTypes = group.workoutTypes || [];
+                          if (!currentTypes.includes(customType.trim())) {
+                            onUpdateGroup({
+                              workoutTypes: [...currentTypes, customType.trim()],
+                            });
+                          }
+                        }
+                        setType(customType.trim());
+                      }
+                      return;
                     }
-                  }
-                  // Set the new type
-                  setType(newType);
-                }}
-                errors={{}}
-                showDuration={true}
-              />
+                    // Clear intervals/exercises when switching types
+                    setType(newType);
+                    if (newType !== 'Run' && newType !== 'Bike' && newType !== 'Swim') {
+                      setIntervals([]);
+                    }
+                    if (newType !== 'Strength') {
+                      setExercises([]);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
+                >
+                  {getWorkoutTypes(group)
+                    .filter((t) => t !== 'Rest')
+                    .map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  <option value="__custom__">+ Add Custom Type</option>
+                </select>
+              </div>
 
+              {/* Amount and Unit - Only for non-Strength types */}
+              {type !== 'Strength' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="workout-amount" className="block text-xs font-medium text-gray-600 mb-1">
+                      Amount
+                    </label>
+                    <input
+                      id="workout-amount"
+                      type="number"
+                      step="0.01"
+                      value={amount || ''}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="e.g., 5"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="workout-unit" className="block text-xs font-medium text-gray-600 mb-1">
+                      Unit
+                    </label>
+                    <select
+                      id="workout-unit"
+                      value={unit || ''}
+                      onChange={(e) => setUnit(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
+                    >
+                      <option value="">Select unit</option>
+                      {['km', 'mi', 'm', 'yd', 'min', 'hr'].map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Intervals Section for Run/Bike/Swim */}
+              {(type === 'Run' || type === 'Bike' || type === 'Swim') && (
+                <IntervalsSection
+                  type={type as 'Run' | 'Bike' | 'Swim'}
+                  intervals={intervals}
+                  expanded={intervalsExpanded}
+                  onToggle={() => setIntervalsExpanded(!intervalsExpanded)}
+                  onAdd={() => {
+                    setIntervals([...intervals, { type: 'warmup' as const }]);
+                    setIntervalsExpanded(true);
+                  }}
+                  onRemove={(index) => setIntervals(intervals.filter((_, i) => i !== index))}
+                  onUpdate={(index, field, value) => {
+                    setIntervals(
+                      intervals.map((interval, i) =>
+                        i === index ? { ...interval, [field]: value } : interval
+                      )
+                    );
+                  }}
+                />
+              )}
+
+              {/* Strength Training Section */}
+              {type === 'Strength' && (
+                <StrengthTrainingSection
+                  exercises={exercises}
+                  errors={{}}
+                  onAddExercise={() => setExercises([...exercises, { name: '', sets: [] }])}
+                  onRemoveExercise={(index) => setExercises(exercises.filter((_, i) => i !== index))}
+                  onUpdateExerciseName={(index, name) => {
+                    setExercises(
+                      exercises.map((exercise, i) => (i === index ? { ...exercise, name } : exercise))
+                    );
+                  }}
+                  onAddSet={(exerciseIndex) => {
+                    setExercises(
+                      exercises.map((exercise, i) =>
+                        i === exerciseIndex
+                          ? { ...exercise, sets: [...exercise.sets, {}] }
+                          : exercise
+                      )
+                    );
+                  }}
+                  onRemoveSet={(exerciseIndex, setIndex) => {
+                    setExercises(
+                      exercises.map((exercise, i) =>
+                        i === exerciseIndex
+                          ? { ...exercise, sets: exercise.sets.filter((_, si) => si !== setIndex) }
+                          : exercise
+                      )
+                    );
+                  }}
+                  onUpdateSet={(exerciseIndex, setIndex, field, value) => {
+                    setExercises(
+                      exercises.map((exercise, i) =>
+                        i === exerciseIndex
+                          ? {
+                              ...exercise,
+                              sets: exercise.sets.map((set, si) =>
+                                si === setIndex
+                                  ? {
+                                      ...set,
+                                      [field]:
+                                        value === ''
+                                          ? undefined
+                                          : field === 'reps'
+                                            ? parseInt(value, 10)
+                                            : parseFloat(value),
+                                    }
+                                  : set
+                              ),
+                            }
+                          : exercise
+                      )
+                    );
+                  }}
+                />
+              )}
+
+              {/* Duration - Available for all types */}
+              <div>
+                <label htmlFor="workout-duration" className="block text-xs font-medium text-gray-600 mb-1">
+                  Duration (minutes)
+                </label>
+                <input
+                  id="workout-duration"
+                  type="number"
+                  step="1"
+                  value={duration || ''}
+                  onChange={(e) => setDuration(e.target.value)}
+                  placeholder="e.g., 30"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Notes - Available for all types */}
               <div>
                 <label
                   htmlFor="workout-notes"

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import DatePicker from '@/components/DatePicker';
 import { FormSkeleton } from '@/components/LoadingSkeleton';
 import { useToast } from '@/components/Toast';
+import EditableEmoji, { getRandomEmoji } from '@/components/dashboard/EditableEmoji';
 import { GOAL_TYPES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { isDateInFuture } from '@/lib/date-utils';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
@@ -17,6 +18,7 @@ export default function CreateGroupPage() {
   const toast = useToast();
   const { user, isLoaded: userLoaded } = useUser();
   const [groupName, setGroupName] = useState('');
+  const [emoji, setEmoji] = useState(() => getRandomEmoji());
   const [goalType, setGoalType] = useState('Marathon');
   const [customGoalType, setCustomGoalType] = useState('');
   const [goalDate, setGoalDate] = useState('');
@@ -75,6 +77,7 @@ export default function CreateGroupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: groupName.trim(),
+          emoji: emoji || '🏃',
           goalType: finalGoalType,
           goalDate,
           inviteCode,
@@ -129,25 +132,30 @@ export default function CreateGroupPage() {
             <label htmlFor="groupName" className="block text-sm font-semibold text-black mb-3">
               Group Name
             </label>
-            <input
-              id="groupName"
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors"
-              placeholder="e.g., Marathon Crew 2025"
-              aria-describedby={errors.groupName ? 'groupName-error' : undefined}
-              aria-invalid={!!errors.groupName}
-            />
-            {errors.groupName && (
-              <p
-                id="groupName-error"
-                className="mt-2 text-sm text-red-600 font-medium"
-                role="alert"
-              >
-                {errors.groupName}
-              </p>
-            )}
+            <div className="flex items-center gap-3">
+              <EditableEmoji emoji={emoji} onChange={setEmoji} size="lg" />
+              <div className="flex-1">
+                <input
+                  id="groupName"
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-primary transition-colors"
+                  placeholder="e.g., Marathon Crew 2025"
+                  aria-describedby={errors.groupName ? 'groupName-error' : undefined}
+                  aria-invalid={!!errors.groupName}
+                />
+                {errors.groupName && (
+                  <p
+                    id="groupName-error"
+                    className="mt-2 text-sm text-red-600 font-medium"
+                    role="alert"
+                  >
+                    {errors.groupName}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div>
