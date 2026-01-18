@@ -129,7 +129,7 @@ export default function ProgressChart({ group, members, workouts }: ProgressChar
                     {getMemberDisplayName(member)}
                   </button>
                   <span className="text-sm font-medium text-gray-600">
-                    {progress.completed}/{progress.total}
+                    {progress.completed} of {progress.total} {progress.unit || 'workouts'}
                     {progress.total > 0 && (
                       <span className="ml-2 text-primary font-bold">{progress.percentage}%</span>
                     )}

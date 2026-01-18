@@ -186,10 +186,11 @@ export function getWeeklyPlanProgress(
   completed: number;
   total: number;
   percentage: number;
+  unit?: string; // Unit for display (e.g., "km", "workouts")
   breakdown?: Record<string, { planned: number; logged: number; unit: string }>;
 } {
   if (!group?.trainingPlan) {
-    return { completed: 0, total: 0, percentage: 0 };
+    return { completed: 0, total: 0, percentage: 0, unit: 'workouts' };
   }
 
   const weekPlanData = getWeekPlan(group, weekKey);
@@ -214,17 +215,25 @@ export function getWeeklyPlanProgress(
 
   const memberWorkouts = getWorkoutsByMemberId(weekWorkouts, memberId);
 
-  // Check if any planned workout has an amount
+  // Always count workouts for the main progress display
+  const plannedCount = Object.values(weekPlan)
+    .flat()
+    .filter((w) => typeof w === 'string' || (typeof w === 'object' && w.type !== 'Rest')).length;
+  const loggedCount = memberWorkouts.length;
+
+  // Check if any planned workout has an amount (for breakdown details)
   const hasAmountsInPlan = Object.values(weekPlan).some((dayWorkouts) =>
     dayWorkouts.some((w) => typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined)
   );
 
-  // Calculate totals by type and unit
-  const plannedByType: Record<string, { amount: number; unit: string }> = {};
-  const loggedByType: Record<string, { amount: number; unit: string }> = {};
+  // Calculate breakdown by type and unit if plan has amounts (for detailed view)
+  const breakdown: Record<string, { planned: number; logged: number; unit: string }> = {};
 
   if (hasAmountsInPlan) {
-    // Sum up planned amounts by type and unit (only count workouts with amounts)
+    const plannedByType: Record<string, { amount: number; unit: string }> = {};
+    const loggedByType: Record<string, { amount: number; unit: string }> = {};
+
+    // Sum up planned amounts by type and unit
     Object.values(weekPlan).forEach((dayWorkouts) => {
       dayWorkouts.forEach((w) => {
         if (typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined) {
@@ -251,68 +260,37 @@ export function getWeeklyPlanProgress(
       }
     });
 
-    // Calculate totals and percentage - only count logged amounts that match planned types
-    let totalPlanned = 0;
-    let totalLoggedMatched = 0; // Only count amounts that match planned types
-    const breakdown: Record<string, { planned: number; logged: number; unit: string }> = {};
-
-    // First, sum all planned amounts and initialize breakdown
-    Object.entries(plannedByType).forEach(([key, data]) => {
-      totalPlanned += data.amount;
-      const type = key.split('_')[0];
-      if (!breakdown[type]) {
-        breakdown[type] = { planned: 0, logged: 0, unit: data.unit };
-      }
-      breakdown[type].planned += data.amount;
-    });
-
-    // Now, only count logged amounts that match planned types (and cap at planned amount)
+    // Build breakdown by workout type
     Object.entries(plannedByType).forEach(([key, plannedData]) => {
       const type = key.split('_')[0];
       const unit = plannedData.unit;
 
+      if (!breakdown[type]) {
+        breakdown[type] = { planned: 0, logged: 0, unit };
+      }
+      breakdown[type].planned += plannedData.amount;
+
       // Find logged amounts for this type and unit
       const loggedKey = `${type}_${unit}`;
       const loggedData = loggedByType[loggedKey];
-
       if (loggedData) {
-        // Only count up to the planned amount (cap at 100% per type)
-        const matchedAmount = Math.min(loggedData.amount, plannedData.amount);
-        totalLoggedMatched += matchedAmount;
-        breakdown[type].logged = matchedAmount;
+        breakdown[type].logged += Math.min(loggedData.amount, plannedData.amount);
       }
     });
-
-    if (totalPlanned === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-
-    const percentage = Math.round((totalLoggedMatched / totalPlanned) * 100);
-
-    return {
-      completed: Math.round(totalLoggedMatched),
-      total: Math.round(totalPlanned),
-      percentage,
-      breakdown,
-    };
-  } else {
-    // No amounts in plan, count workouts instead
-    const plannedCount = Object.values(weekPlan)
-      .flat()
-      .filter((w) => typeof w === 'string' || (typeof w === 'object' && w.type !== 'Rest')).length;
-    const loggedCount = memberWorkouts.length;
-
-    if (plannedCount === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-
-    const percentage = Math.round((loggedCount / plannedCount) * 100);
-    return {
-      completed: loggedCount,
-      total: plannedCount,
-      percentage,
-    };
   }
+
+  if (plannedCount === 0) {
+    return { completed: 0, total: 0, percentage: 0, unit: 'workouts', breakdown };
+  }
+
+  const percentage = Math.round((loggedCount / plannedCount) * 100);
+  return {
+    completed: loggedCount,
+    total: plannedCount,
+    percentage,
+    unit: 'workouts',
+    breakdown: Object.keys(breakdown).length > 0 ? breakdown : undefined,
+  };
 }
 
 // Re-export formatDateForDisplay as formatDate for backward compatibility
