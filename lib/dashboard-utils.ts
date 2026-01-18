@@ -76,11 +76,89 @@ export function formatPlannedWorkout(
       parts.push(`${workout.duration} min`);
     }
     // Legacy field - use amount/unit instead
-    if ((workout as any).distance) {
-      parts.push(`${(workout as any).distance} km`);
+    const legacyWorkout = workout as PlannedWorkout & { distance?: number };
+    if (legacyWorkout.distance) {
+      parts.push(`${legacyWorkout.distance} km`);
     }
   }
   return parts.join(' - ');
+}
+
+/**
+ * Format a workout for display in the calendar grid (with intervals and exercises)
+ * Used in setup-plan and edit-plan pages
+ */
+export function formatWorkoutForCalendar(workout: string | PlannedWorkout): string {
+  if (typeof workout === 'string') {
+    return workout;
+  }
+
+  let workoutText = workout.type;
+  if (workout.amount) {
+    workoutText += ` ${workout.amount}${workout.unit || 'km'}`;
+  }
+  if (workout.duration) {
+    workoutText += ` (${workout.duration}min)`;
+  }
+  if (workout.intervals && workout.intervals.length > 0) {
+    // Format intervals with repeats
+    const intervalParts: string[] = [];
+    const workoutType = workout.type;
+
+    workout.intervals.forEach((interval, idx) => {
+      const parts: string[] = [];
+
+      // For recovery intervals after a repeated work interval, show as ", time break"
+      if (interval.type === 'recovery' && idx > 0) {
+        const prevInterval = workout.intervals?.[idx - 1];
+        if (prevInterval?.repeats && prevInterval.repeats > 1) {
+          if (interval.time) {
+            const minutes = Math.floor(interval.time / 60);
+            if (minutes > 0) {
+              intervalParts.push(`, ${minutes}min break`);
+            } else {
+              intervalParts.push(`, ${interval.time}sec break`);
+            }
+          } else if (interval.distance) {
+            const unit = workoutType === 'Swim' ? 'm' : 'km';
+            intervalParts.push(`, ${interval.distance}${unit} break`);
+          }
+          return; // Skip adding this interval separately
+        }
+      }
+
+      // Add repeats prefix if > 1
+      if (interval.repeats && interval.repeats > 1) {
+        parts.push(`${interval.repeats}*`);
+      }
+
+      // Add distance
+      if (interval.distance) {
+        const unit = workoutType === 'Swim' ? 'm' : 'km';
+        parts.push(`${interval.distance}${unit}`);
+      }
+
+      // Add note
+      if (interval.note) {
+        parts.push(interval.note);
+      }
+
+      if (parts.length > 0) {
+        intervalParts.push(parts.join(' '));
+      }
+    });
+
+    if (intervalParts.length > 0) {
+      workoutText += ` • ${intervalParts.join(' ')}`;
+    } else {
+      workoutText += ` • ${workout.intervals.length} interval${workout.intervals.length > 1 ? 's' : ''}`;
+    }
+  }
+  if (workout.exercises && workout.exercises.length > 0) {
+    workoutText += ` • ${workout.exercises.length} exercise${workout.exercises.length > 1 ? 's' : ''}`;
+  }
+
+  return workoutText;
 }
 
 export function getRecentWorkouts(workouts: Workout[], days: number = 7): Workout[] {
@@ -108,10 +186,11 @@ export function getWeeklyPlanProgress(
   completed: number;
   total: number;
   percentage: number;
+  unit?: string; // Unit for display (e.g., "km", "workouts")
   breakdown?: Record<string, { planned: number; logged: number; unit: string }>;
 } {
   if (!group?.trainingPlan) {
-    return { completed: 0, total: 0, percentage: 0 };
+    return { completed: 0, total: 0, percentage: 0, unit: 'workouts' };
   }
 
   const weekPlanData = getWeekPlan(group, weekKey);
@@ -136,17 +215,25 @@ export function getWeeklyPlanProgress(
 
   const memberWorkouts = getWorkoutsByMemberId(weekWorkouts, memberId);
 
-  // Check if any planned workout has an amount
+  // Always count workouts for the main progress display
+  const plannedCount = Object.values(weekPlan)
+    .flat()
+    .filter((w) => typeof w === 'string' || (typeof w === 'object' && w.type !== 'Rest')).length;
+  const loggedCount = memberWorkouts.length;
+
+  // Check if any planned workout has an amount (for breakdown details)
   const hasAmountsInPlan = Object.values(weekPlan).some((dayWorkouts) =>
     dayWorkouts.some((w) => typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined)
   );
 
-  // Calculate totals by type and unit
-  const plannedByType: Record<string, { amount: number; unit: string }> = {};
-  const loggedByType: Record<string, { amount: number; unit: string }> = {};
+  // Calculate breakdown by type and unit if plan has amounts (for detailed view)
+  const breakdown: Record<string, { planned: number; logged: number; unit: string }> = {};
 
   if (hasAmountsInPlan) {
-    // Sum up planned amounts by type and unit (only count workouts with amounts)
+    const plannedByType: Record<string, { amount: number; unit: string }> = {};
+    const loggedByType: Record<string, { amount: number; unit: string }> = {};
+
+    // Sum up planned amounts by type and unit
     Object.values(weekPlan).forEach((dayWorkouts) => {
       dayWorkouts.forEach((w) => {
         if (typeof w === 'object' && w.type !== 'Rest' && w.amount !== undefined) {
@@ -173,68 +260,37 @@ export function getWeeklyPlanProgress(
       }
     });
 
-    // Calculate totals and percentage - only count logged amounts that match planned types
-    let totalPlanned = 0;
-    let totalLoggedMatched = 0; // Only count amounts that match planned types
-    const breakdown: Record<string, { planned: number; logged: number; unit: string }> = {};
-
-    // First, sum all planned amounts and initialize breakdown
-    Object.entries(plannedByType).forEach(([key, data]) => {
-      totalPlanned += data.amount;
-      const type = key.split('_')[0];
-      if (!breakdown[type]) {
-        breakdown[type] = { planned: 0, logged: 0, unit: data.unit };
-      }
-      breakdown[type].planned += data.amount;
-    });
-
-    // Now, only count logged amounts that match planned types (and cap at planned amount)
+    // Build breakdown by workout type
     Object.entries(plannedByType).forEach(([key, plannedData]) => {
       const type = key.split('_')[0];
       const unit = plannedData.unit;
 
+      if (!breakdown[type]) {
+        breakdown[type] = { planned: 0, logged: 0, unit };
+      }
+      breakdown[type].planned += plannedData.amount;
+
       // Find logged amounts for this type and unit
       const loggedKey = `${type}_${unit}`;
       const loggedData = loggedByType[loggedKey];
-
       if (loggedData) {
-        // Only count up to the planned amount (cap at 100% per type)
-        const matchedAmount = Math.min(loggedData.amount, plannedData.amount);
-        totalLoggedMatched += matchedAmount;
-        breakdown[type].logged = matchedAmount;
+        breakdown[type].logged += Math.min(loggedData.amount, plannedData.amount);
       }
     });
-
-    if (totalPlanned === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-
-    const percentage = Math.round((totalLoggedMatched / totalPlanned) * 100);
-
-    return {
-      completed: Math.round(totalLoggedMatched),
-      total: Math.round(totalPlanned),
-      percentage,
-      breakdown,
-    };
-  } else {
-    // No amounts in plan, count workouts instead
-    const plannedCount = Object.values(weekPlan)
-      .flat()
-      .filter((w) => typeof w === 'string' || (typeof w === 'object' && w.type !== 'Rest')).length;
-    const loggedCount = memberWorkouts.length;
-
-    if (plannedCount === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-
-    const percentage = Math.round((loggedCount / plannedCount) * 100);
-    return {
-      completed: loggedCount,
-      total: plannedCount,
-      percentage,
-    };
   }
+
+  if (plannedCount === 0) {
+    return { completed: 0, total: 0, percentage: 0, unit: 'workouts', breakdown };
+  }
+
+  const percentage = Math.round((loggedCount / plannedCount) * 100);
+  return {
+    completed: loggedCount,
+    total: plannedCount,
+    percentage,
+    unit: 'workouts',
+    breakdown: Object.keys(breakdown).length > 0 ? breakdown : undefined,
+  };
 }
 
 // Re-export formatDateForDisplay as formatDate for backward compatibility
@@ -249,3 +305,138 @@ export function getInviteUrl(group: Group | null): string {
 
 // Re-export from date-utils for backward compatibility
 export { getDayIndex, isTodayDay as isToday } from './date-utils';
+
+export interface GroupStatistics {
+  totalCalories: number;
+  totalKilometers: number;
+  totalWorkouts: number;
+  totalDuration: number; // in minutes
+  activeDays: number;
+  averagePace: number | null; // min/km for Run workouts
+  currentStreak: number; // consecutive days with workouts
+  averageCaloriesPerWorkout: number | null; // average calories per workout
+}
+
+/**
+ * Calculate aggregated group statistics from workouts
+ */
+export function getGroupStatistics(workouts: Workout[]): GroupStatistics {
+  if (workouts.length === 0) {
+    return {
+      totalCalories: 0,
+      totalKilometers: 0,
+      totalWorkouts: 0,
+      totalDuration: 0,
+      activeDays: 0,
+      averagePace: null,
+      currentStreak: 0,
+      averageCaloriesPerWorkout: null,
+    };
+  }
+
+  let totalCalories = 0;
+  let totalKilometers = 0;
+  let totalDuration = 0;
+  let workoutsWithCalories = 0;
+  const uniqueDates = new Set<string>();
+  const runPaces: number[] = [];
+
+  workouts.forEach((workout) => {
+    // Sum calories
+    if (workout.calories) {
+      totalCalories += workout.calories;
+      workoutsWithCalories++;
+    }
+
+    // Sum distance (handle both amount/unit and legacy distance field)
+    const distance = workout.amount || workout.distance;
+    const unit = workout.unit || 'km';
+
+    if (distance !== undefined) {
+      // Convert to kilometers
+      if (unit === 'km') {
+        totalKilometers += distance;
+      } else if (unit === 'm') {
+        totalKilometers += distance / 1000;
+      } else if (unit === 'mi') {
+        totalKilometers += distance * 1.60934;
+      } else {
+        // Default to km if unit is unknown
+        totalKilometers += distance;
+      }
+    }
+
+    // Sum duration
+    if (workout.duration) {
+      totalDuration += workout.duration;
+    }
+
+    // Track unique dates
+    uniqueDates.add(workout.date);
+
+    // Collect run paces for average
+    if (workout.type === 'Run' && workout.avgPace) {
+      runPaces.push(workout.avgPace);
+    }
+  });
+
+  // Calculate average pace
+  const averagePace =
+    runPaces.length > 0
+      ? runPaces.reduce((sum, pace) => sum + pace, 0) / runPaces.length
+      : null;
+
+  // Calculate average calories per workout
+  const averageCaloriesPerWorkout =
+    workoutsWithCalories > 0 ? totalCalories / workoutsWithCalories : null;
+
+  // Calculate current streak (consecutive days with workouts)
+  const sortedDates = Array.from(uniqueDates)
+    .map((date) => new Date(date))
+    .sort((a, b) => b.getTime() - a.getTime()); // Most recent first
+
+  let currentStreak = 0;
+  if (sortedDates.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if today or yesterday has a workout
+    const mostRecentDate = sortedDates[0];
+    mostRecentDate.setHours(0, 0, 0, 0);
+
+    const daysDiff = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysDiff <= 1) {
+      // Start counting from most recent date
+      let expectedDate = new Date(mostRecentDate);
+      for (const workoutDate of sortedDates) {
+        const workoutDateOnly = new Date(workoutDate);
+        workoutDateOnly.setHours(0, 0, 0, 0);
+
+        if (
+          workoutDateOnly.getTime() === expectedDate.getTime() ||
+          workoutDateOnly.getTime() === expectedDate.getTime() - 86400000
+        ) {
+          currentStreak++;
+          expectedDate = new Date(workoutDateOnly);
+          expectedDate.setDate(expectedDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    totalCalories: Math.round(totalCalories),
+    totalKilometers: Math.round(totalKilometers * 10) / 10, // Round to 1 decimal
+    totalWorkouts: workouts.length,
+    totalDuration: Math.round(totalDuration),
+    activeDays: uniqueDates.size,
+    averagePace: averagePace ? Math.round(averagePace * 10) / 10 : null,
+    currentStreak,
+    averageCaloriesPerWorkout: averageCaloriesPerWorkout
+      ? Math.round(averageCaloriesPerWorkout)
+      : null,
+  };
+}

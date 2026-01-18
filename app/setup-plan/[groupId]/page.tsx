@@ -4,10 +4,12 @@ import { Plus, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import PlanModeSelector, { type PlanMode } from '@/components/plan/PlanModeSelector';
 import { useToast } from '@/components/Toast';
-import BasicWorkoutFields from '@/components/workout-form/BasicWorkoutFields';
+import WorkoutFields from '@/components/workout-form/WorkoutFields';
 import { DAYS } from '@/lib/constants';
-import type { Group, PlannedWorkout, WeeklyPlan } from '@/lib/db';
+import { formatWorkoutForCalendar, getWeekKey } from '@/lib/dashboard-utils';
+import type { Exercise, Group, Interval, PlannedWorkout, WeeklyPlan } from '@/lib/db';
 import { getErrorMessage, handleAsync } from '@/lib/error-handler';
 
 export default function SetupPlanPage() {
@@ -16,6 +18,8 @@ export default function SetupPlanPage() {
   const toast = useToast();
   const groupId = params.groupId as string;
   const [group, setGroup] = useState<Group | null>(null);
+  const [planMode, setPlanMode] = useState<PlanMode>('weekly');
+  const [currentWeekKey, setCurrentWeekKey] = useState(getWeekKey());
   const [trainingPlan, setTrainingPlan] = useState<WeeklyPlan>({});
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -25,13 +29,20 @@ export default function SetupPlanPage() {
     unit: string;
     duration: string;
     notes: string;
+    intervals: Interval[];
+    exercises: Exercise[];
+    avgPace: string;
   }>({
     type: 'Run',
     amount: '',
     unit: '',
     duration: '',
     notes: '',
+    intervals: [],
+    exercises: [],
+    avgPace: '',
   });
+  const [intervalsExpanded, setIntervalsExpanded] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const loadedGroupIdRef = useRef<string | null>(null);
@@ -62,6 +73,7 @@ export default function SetupPlanPage() {
     }
 
     setGroup(response.group);
+    // Initialize training plan - will be set based on mode in useEffect
     setTrainingPlan(response.group.trainingPlan || {});
     loadedGroupIdRef.current = groupId;
     setLoading(false);
@@ -75,6 +87,20 @@ export default function SetupPlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, loadGroup]);
 
+  // Update training plan when mode or week changes
+  useEffect(() => {
+    if (!group) return;
+
+    if (planMode === 'weekly') {
+      setTrainingPlan(group.trainingPlan || {});
+    } else {
+      // In week-by-week mode, load the plan for the current week
+      const weekPlan =
+        group.weeklyPlanOverrides?.[currentWeekKey] || group.trainingPlan || {};
+      setTrainingPlan(weekPlan);
+    }
+  }, [group, planMode, currentWeekKey]);
+
   const handleAddWorkout = (day: string) => {
     setEditingDay(day);
     setEditingIndex(null);
@@ -84,7 +110,11 @@ export default function SetupPlanPage() {
       unit: '',
       duration: '',
       notes: '',
+      intervals: [],
+      exercises: [],
+      avgPace: '',
     });
+    setIntervalsExpanded(false);
   };
 
   const handleEditWorkout = (day: string, index: number) => {
@@ -98,6 +128,9 @@ export default function SetupPlanPage() {
         unit: '',
         duration: '',
         notes: workout,
+        intervals: [],
+        exercises: [],
+        avgPace: '',
       });
     } else {
       setWorkoutForm({
@@ -106,10 +139,14 @@ export default function SetupPlanPage() {
         unit: workout.unit || '',
         duration: workout.duration?.toString() || '',
         notes: workout.notes || '',
+        intervals: workout.intervals || [],
+        exercises: workout.exercises || [],
+        avgPace: workout.avgPace?.toString() || '',
       });
     }
     setEditingDay(day);
     setEditingIndex(index);
+    setIntervalsExpanded(((workout as PlannedWorkout)?.intervals?.length || 0) > 0);
   };
 
   const handleSaveWorkout = () => {
@@ -128,6 +165,9 @@ export default function SetupPlanPage() {
       amount: workoutForm.amount ? parseFloat(workoutForm.amount) : undefined,
       unit: workoutForm.unit || undefined,
       notes: workoutForm.notes.trim() || undefined,
+      intervals: workoutForm.intervals.length > 0 ? workoutForm.intervals : undefined,
+      exercises: workoutForm.exercises.length > 0 ? workoutForm.exercises : undefined,
+      avgPace: workoutForm.avgPace ? parseFloat(workoutForm.avgPace) : undefined,
     };
 
     if (editingIndex !== null) {
@@ -145,7 +185,11 @@ export default function SetupPlanPage() {
       unit: '',
       duration: '',
       notes: '',
+      intervals: [],
+      exercises: [],
+      avgPace: '',
     });
+    setIntervalsExpanded(false);
     setEditingDay(null);
     setEditingIndex(null);
   };
@@ -159,7 +203,11 @@ export default function SetupPlanPage() {
       unit: '',
       duration: '',
       notes: '',
+      intervals: [],
+      exercises: [],
+      avgPace: '',
     });
+    setIntervalsExpanded(false);
   };
 
   const handleAddCustomType = async (newType: string) => {
@@ -199,21 +247,43 @@ export default function SetupPlanPage() {
     }
   };
 
+
   const handleDone = async () => {
     if (!group || !group._id) return;
 
     const { error } = await handleAsync(async () => {
-      const res = await fetch('/api/groups', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupId: group._id?.toString() || group._id,
-          trainingPlan,
-        }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to update group');
+      if (planMode === 'weekly') {
+        // Save to default trainingPlan
+        const res = await fetch('/api/groups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            groupId: group._id?.toString() || group._id,
+            trainingPlan,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update group');
+        }
+      } else {
+        // Save to weeklyPlanOverrides for the current week
+        const newOverrides = {
+          ...(group.weeklyPlanOverrides || {}),
+          [currentWeekKey]: trainingPlan,
+        };
+        const res = await fetch('/api/groups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            groupId: group._id?.toString() || group._id,
+            weeklyPlanOverrides: newOverrides,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update group');
+        }
       }
     }, 'handleDone');
 
@@ -255,9 +325,38 @@ export default function SetupPlanPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Set Up Your Weekly Training Plan
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
-            Add workouts for each day of the week. This plan will repeat weekly.
-          </p>
+
+          {/* Plan Mode Selector */}
+          <PlanModeSelector
+            mode={planMode}
+            onModeChange={(mode) => {
+              setPlanMode(mode);
+              // When switching modes, update the training plan
+              if (mode === 'weekly') {
+                // Switch to default plan
+                setTrainingPlan(group?.trainingPlan || {});
+              } else {
+                // Switch to week-by-week, load plan for current week
+                if (!currentWeekKey) {
+                  setCurrentWeekKey(getWeekKey());
+                }
+                const weekPlan =
+                  group?.weeklyPlanOverrides?.[currentWeekKey] || group?.trainingPlan || {};
+                setTrainingPlan(weekPlan);
+              }
+            }}
+            currentWeekKey={currentWeekKey}
+            onWeekChange={(weekKey) => {
+              setCurrentWeekKey(weekKey);
+              // Load the plan for the new week
+              if (planMode === 'week-by-week' && group) {
+                const weekPlan =
+                  group.weeklyPlanOverrides?.[weekKey] || group.trainingPlan || {};
+                setTrainingPlan(weekPlan);
+              }
+            }}
+            showWeekNavigator={true}
+          />
 
           {/* Calendar Grid - Responsive: 2 cols mobile, 4 cols tablet, 7 cols desktop */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-8">
@@ -278,13 +377,14 @@ export default function SetupPlanPage() {
                   <div className="flex-1 space-y-1 sm:space-y-1.5 mb-2 min-h-0 overflow-y-auto max-h-[100px] sm:max-h-[120px]">
                     {workouts.length > 0 ? (
                       workouts.map((workout, index) => {
-                        const workoutText =
+                        const workoutText = formatWorkoutForCalendar(workout);
+                        const workoutKey =
                           typeof workout === 'string'
-                            ? workout
-                            : `${workout.type}${workout.amount ? ` ${workout.amount}${workout.unit || 'km'}` : ''}${workout.duration ? ` (${workout.duration}min)` : ''}`;
+                            ? `${day}-${index}-${workout}`
+                            : `${day}-${index}-${workout.type}-${workout.notes || ''}`;
                         return (
                           <div
-                            key={index}
+                            key={workoutKey}
                             className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-lg text-xs border border-primary/20 w-full"
                           >
                             <button
@@ -349,7 +449,7 @@ export default function SetupPlanPage() {
       {/* Workout Edit Modal */}
       {editingDay && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
                 {editingIndex !== null ? 'Edit Workout' : 'Add Workout'} - {editingDay}
@@ -365,38 +465,43 @@ export default function SetupPlanPage() {
             </div>
 
             <div className="space-y-4">
-              <BasicWorkoutFields
+              <WorkoutFields
                 group={group}
                 type={workoutForm.type}
                 amount={workoutForm.amount}
                 unit={workoutForm.unit}
                 duration={workoutForm.duration}
-                onTypeChange={(type) => setWorkoutForm((prev) => ({ ...prev, type }))}
+                notes={workoutForm.notes}
+                intervals={workoutForm.intervals}
+                exercises={workoutForm.exercises}
+                avgPace={workoutForm.avgPace}
+                onTypeChange={(type) => {
+                  setWorkoutForm((prev) => ({
+                    ...prev,
+                    type,
+                    intervals:
+                      type === 'Run' || type === 'Bike' || type === 'Swim' ? prev.intervals : [],
+                    exercises: type === 'Strength' ? prev.exercises : [],
+                  }));
+                }}
                 onAmountChange={(amount) => setWorkoutForm((prev) => ({ ...prev, amount }))}
                 onUnitChange={(unit) => setWorkoutForm((prev) => ({ ...prev, unit }))}
                 onDurationChange={(duration) => setWorkoutForm((prev) => ({ ...prev, duration }))}
+                onNotesChange={(notes) => setWorkoutForm((prev) => ({ ...prev, notes }))}
+                onIntervalsChange={(intervals) =>
+                  setWorkoutForm((prev) => ({ ...prev, intervals }))
+                }
+                onExercisesChange={(exercises) =>
+                  setWorkoutForm((prev) => ({ ...prev, exercises }))
+                }
+                onAvgPaceChange={(avgPace) => setWorkoutForm((prev) => ({ ...prev, avgPace }))}
                 showCustomType={true}
                 onCustomTypeAdd={handleAddCustomType}
                 errors={{}}
                 showDuration={true}
+                intervalsExpanded={intervalsExpanded}
+                onToggleIntervals={() => setIntervalsExpanded(!intervalsExpanded)}
               />
-
-              <div>
-                <label
-                  htmlFor="workout-notes"
-                  className="block text-sm font-semibold text-black mb-3"
-                >
-                  Notes (optional)
-                </label>
-                <textarea
-                  id="workout-notes"
-                  value={workoutForm.notes}
-                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="e.g., Easy pace, Upper body focus"
-                  rows={3}
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-primary transition-colors resize-none"
-                />
-              </div>
 
               <div className="flex gap-3 pt-4">
                 <button
@@ -434,6 +539,7 @@ export default function SetupPlanPage() {
                 className="flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg bg-gray-50"
               />
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="px-4 py-2 bg-primary text-white rounded-full hover:bg-primary-dark transition-colors whitespace-nowrap text-sm sm:text-base"
               >
@@ -441,6 +547,7 @@ export default function SetupPlanPage() {
               </button>
             </div>
             <button
+              type="button"
               onClick={handleGoToDashboard}
               className="btn-primary w-full text-base sm:text-lg"
             >

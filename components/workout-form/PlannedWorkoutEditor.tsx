@@ -2,8 +2,8 @@
 
 import { Activity, Bike, Dumbbell, Footprints, Waves, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { Group, PlannedWorkout } from '@/lib/db';
-import BasicWorkoutFields from './BasicWorkoutFields';
+import type { Exercise, Group, Interval, PlannedWorkout } from '@/lib/db';
+import WorkoutFields from './WorkoutFields';
 
 interface PlannedWorkoutEditorProps {
   workout: string | PlannedWorkout;
@@ -47,24 +47,36 @@ export default function PlannedWorkoutEditor({
   const [notes, setNotes] = useState(
     isString ? workout : workout.notes || (workout as any).description || ''
   );
+  const [intervals, setIntervals] = useState<Interval[]>(
+    isString ? [] : workout.intervals || []
+  );
+  const [exercises, setExercises] = useState<Exercise[]>(
+    isString ? [] : workout.exercises || []
+  );
+  const [intervalsExpanded, setIntervalsExpanded] = useState(false);
 
   // Update state when workout prop changes (important for custom types)
   useEffect(() => {
     if (!isString && workout.type) {
       setType(workout.type);
+      setIntervals(workout.intervals || []);
+      setExercises(workout.exercises || []);
+      setIntervalsExpanded((workout.intervals?.length || 0) > 0);
     }
   }, [workout, isString]);
 
   const handleSave = () => {
     if (type === 'Rest') {
       onUpdate({ type: 'Rest' });
-    } else if (notes.trim() || duration || amount) {
+    } else if (notes.trim() || duration || amount || intervals.length > 0 || exercises.length > 0) {
       const plannedWorkout: PlannedWorkout = {
         type,
         duration: duration ? parseInt(duration, 10) : undefined,
         amount: amount ? parseFloat(amount) : undefined,
         unit: unit || undefined,
         notes: notes.trim() || undefined,
+        intervals: intervals.length > 0 ? intervals : undefined,
+        exercises: exercises.length > 0 ? exercises : undefined,
       };
       onUpdate(plannedWorkout);
     } else {
@@ -81,6 +93,8 @@ export default function PlannedWorkoutEditor({
       setType('Run');
       setAmount('');
       setUnit('');
+      setIntervals([]);
+      setExercises([]);
     } else {
       setType(workout.type);
       // Migrate description to notes for backward compatibility
@@ -88,7 +102,10 @@ export default function PlannedWorkoutEditor({
       setDuration(workout.duration?.toString() || '');
       setAmount(workout.amount?.toString() || '');
       setUnit(workout.unit || '');
+      setIntervals(workout.intervals || []);
+      setExercises(workout.exercises || []);
     }
+    setIntervalsExpanded(false);
     setIsEditing(false);
   };
 
@@ -129,7 +146,7 @@ export default function PlannedWorkoutEditor({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Edit Workout</h3>
           <button
@@ -144,52 +161,47 @@ export default function PlannedWorkoutEditor({
 
         <div className="space-y-4">
           {type !== 'Rest' && (
-            <>
-              <BasicWorkoutFields
-                group={group}
-                type={type}
-                amount={amount}
-                unit={unit}
-                duration={duration}
-                onTypeChange={setType}
-                onAmountChange={setAmount}
-                onUnitChange={setUnit}
-                onDurationChange={setDuration}
-                showCustomType={true}
-                onCustomTypeAdd={async (newType) => {
-                  // Add custom type to group
-                  if (group && onUpdateGroup) {
-                    const currentTypes = group.workoutTypes || [];
-                    if (!currentTypes.includes(newType)) {
-                      onUpdateGroup({
-                        workoutTypes: [...currentTypes, newType],
-                      });
-                    }
+            <WorkoutFields
+              group={group}
+              type={type}
+              amount={amount}
+              unit={unit}
+              duration={duration}
+              notes={notes}
+              intervals={intervals}
+              exercises={exercises}
+              onTypeChange={(newType) => {
+                setType(newType);
+                if (newType !== 'Run' && newType !== 'Bike' && newType !== 'Swim') {
+                  setIntervals([]);
+                }
+                if (newType !== 'Strength') {
+                  setExercises([]);
+                }
+              }}
+              onAmountChange={setAmount}
+              onUnitChange={setUnit}
+              onDurationChange={setDuration}
+              onNotesChange={setNotes}
+              onIntervalsChange={setIntervals}
+              onExercisesChange={setExercises}
+              showCustomType={true}
+              onCustomTypeAdd={async (newType) => {
+                if (group && onUpdateGroup) {
+                  const currentTypes = group.workoutTypes || [];
+                  if (!currentTypes.includes(newType)) {
+                    onUpdateGroup({
+                      workoutTypes: [...currentTypes, newType],
+                    });
                   }
-                  // Set the new type
-                  setType(newType);
-                }}
-                errors={{}}
-                showDuration={true}
-              />
-
-              <div>
-                <label
-                  htmlFor="workout-notes"
-                  className="block text-xs font-medium text-gray-600 mb-1"
-                >
-                  Notes (optional)
-                </label>
-                <textarea
-                  id="workout-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g., Easy pace, Upper body focus"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary resize-none"
-                />
-              </div>
-            </>
+                }
+                setType(newType);
+              }}
+              errors={{}}
+              showDuration={true}
+              intervalsExpanded={intervalsExpanded}
+              onToggleIntervals={() => setIntervalsExpanded(!intervalsExpanded)}
+            />
           )}
 
           <div className="flex gap-3 pt-2">

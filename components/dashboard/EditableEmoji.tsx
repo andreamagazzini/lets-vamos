@@ -44,6 +44,10 @@ const EMOJI_OPTIONS = [
   '🏄',
 ];
 
+export const getRandomEmoji = () => {
+  return EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
+};
+
 const sizeClasses = {
   sm: 'w-6 h-6 text-lg',
   md: 'w-8 h-8 text-xl',
@@ -52,13 +56,15 @@ const sizeClasses = {
 
 export default function EditableEmoji({ emoji, onChange, size = 'md' }: EditableEmojiProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(emoji || '🏃');
+  const [randomEmoji] = useState(() => getRandomEmoji());
+  const displayEmoji = emoji || randomEmoji;
+  const [inputValue, setInputValue] = useState(displayEmoji);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setInputValue(emoji || '🏃');
-  }, [emoji]);
+    setInputValue(emoji || randomEmoji);
+  }, [emoji, randomEmoji]);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -97,7 +103,7 @@ export default function EditableEmoji({ emoji, onChange, size = 'md' }: Editable
     if (e.key === 'Enter') {
       setIsOpen(false);
     } else if (e.key === 'Escape') {
-      setInputValue(emoji || '🏃');
+      setInputValue(emoji || randomEmoji);
       setIsOpen(false);
     }
   };
@@ -110,7 +116,7 @@ export default function EditableEmoji({ emoji, onChange, size = 'md' }: Editable
         className={`${sizeClasses[size]} flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 transition-all cursor-pointer group relative`}
         aria-label="Edit emoji"
       >
-        <span className="leading-none">{emoji || '🏃'}</span>
+        <span className="leading-none">{displayEmoji}</span>
         <span className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-0.5 shadow-sm">
           <Smile className="w-3 h-3 text-gray-600" />
         </span>
@@ -142,7 +148,7 @@ export default function EditableEmoji({ emoji, onChange, size = 'md' }: Editable
               onChange={handleInputChange}
               onKeyDown={handleInputKeyDown}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:border-primary"
-              placeholder="🏃"
+              placeholder={randomEmoji}
               maxLength={2}
             />
           </div>

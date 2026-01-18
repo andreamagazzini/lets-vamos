@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { IntervalSchema, ExerciseSchema } from './Workout';
 
 // Schema definitions for validation
 export const GroupPlanSettingsSchema = z.object({
@@ -16,6 +17,9 @@ export const PlannedWorkoutSchema = z.object({
   amount: z.number().optional(),
   unit: z.string().optional(),
   notes: z.string().optional(),
+  intervals: z.array(IntervalSchema).optional(),
+  exercises: z.array(ExerciseSchema).optional(),
+  avgPace: z.number().optional(), // min/km for Run
 });
 
 export const WeeklyPlanSchema = z.record(

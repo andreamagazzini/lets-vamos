@@ -8,6 +8,7 @@ import EditableEmoji from '@/components/dashboard/EditableEmoji';
 import InviteSection from '@/components/dashboard/InviteSection';
 import ProgressChart from '@/components/dashboard/ProgressChart';
 import RecentActivity from '@/components/dashboard/RecentActivity';
+import StatisticsCard from '@/components/dashboard/StatisticsCard';
 import WeeklyPlanCard from '@/components/dashboard/WeeklyPlanCard';
 import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 import LogWorkoutModal from '@/components/LogWorkoutModal';
@@ -126,6 +127,11 @@ export default function DashboardPage() {
               onDeleteWorkout={handleDeleteWorkout}
             />
           </div>
+        </div>
+
+        {/* Group Statistics */}
+        <div className="mb-6">
+          <StatisticsCard workouts={workouts} />
         </div>
 
         <InviteSection group={group} />

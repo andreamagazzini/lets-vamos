@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
 export const IntervalSchema = z.object({
-  type: z.enum(['warmup', 'work', 'recovery']),
+  type: z.enum(['warmup', 'work', 'cooldown', 'recovery']),
   distance: z.number().optional(),
   time: z.number().optional(), // seconds
   pace: z.number().optional(),
   avgHeartRate: z.number().optional(),
+  note: z.string().optional(),
+  repeats: z.number().optional(), // number of times to repeat this interval
 });
 
 export const WorkoutSetSchema = z.object({
@@ -28,12 +30,14 @@ export const WorkoutSchema = z.object({
   unit: z.string().optional(),
   notes: z.string().optional(),
   date: z.string().min(1),
-  // Cardio fields
-  calories: z.number().optional(),
-  avgHeartRate: z.number().optional(),
-  intervals: z.array(IntervalSchema).optional(),
-  // Bike-specific
-  avgSpeed: z.number().optional(), // km/h
+    // Cardio fields
+    calories: z.number().optional(),
+    avgHeartRate: z.number().optional(),
+    intervals: z.array(IntervalSchema).optional(),
+    // Run-specific
+    avgPace: z.number().optional(), // min/km
+    // Bike-specific
+    avgSpeed: z.number().optional(), // km/h
   // Swim-specific
   distancePer100m: z.number().optional(), // seconds per 100m
   laps: z.number().optional(),

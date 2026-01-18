@@ -116,6 +116,15 @@ export async function GET() {
             amount: { type: 'number' },
             unit: { type: 'string' },
             notes: { type: 'string' },
+            intervals: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Interval' },
+            },
+            exercises: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Exercise' },
+            },
+            avgPace: { type: 'number', description: 'min/km for Run' },
           },
         },
         WeeklyPlan: {
@@ -199,6 +208,7 @@ export async function GET() {
               type: 'array',
               items: { $ref: '#/components/schemas/Interval' },
             },
+            avgPace: { type: 'number', description: 'min/km for Run' },
             avgSpeed: { type: 'number', description: 'km/h' },
             distancePer100m: { type: 'number', description: 'seconds per 100m' },
             laps: { type: 'number' },
@@ -216,11 +226,13 @@ export async function GET() {
         Interval: {
           type: 'object',
           properties: {
-            type: { type: 'string', enum: ['warmup', 'work', 'recovery'] },
+            type: { type: 'string', enum: ['warmup', 'work', 'cooldown', 'recovery'] },
             distance: { type: 'number' },
             time: { type: 'number', description: 'seconds' },
             pace: { type: 'number' },
             avgHeartRate: { type: 'number' },
+            note: { type: 'string' },
+            repeats: { type: 'number', description: 'number of times to repeat this interval' },
           },
         },
         Exercise: {
@@ -257,6 +269,7 @@ export async function GET() {
               type: 'array',
               items: { $ref: '#/components/schemas/Interval' },
             },
+            avgPace: { type: 'number', description: 'min/km for Run' },
             avgSpeed: { type: 'number' },
             distancePer100m: { type: 'number' },
             laps: { type: 'number' },
@@ -284,6 +297,7 @@ export async function GET() {
               type: 'array',
               items: { $ref: '#/components/schemas/Interval' },
             },
+            avgPace: { type: 'number', description: 'min/km for Run' },
             avgSpeed: { type: 'number' },
             distancePer100m: { type: 'number' },
             laps: { type: 'number' },

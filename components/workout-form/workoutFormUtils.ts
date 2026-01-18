@@ -11,6 +11,7 @@ export interface WorkoutFormState {
   notes: string;
   date: string;
   intervals: Interval[];
+  avgPace: string; // min/km for Run
   avgSpeed: string;
   distancePer100m: string;
   laps: string;
@@ -75,6 +76,7 @@ export function buildWorkoutData(
     notes: state.notes.trim() || undefined,
     date: state.date,
     intervals: state.intervals.length > 0 ? state.intervals : undefined,
+    avgPace: state.avgPace ? parseFloat(state.avgPace) : undefined,
     avgSpeed: state.avgSpeed ? parseFloat(state.avgSpeed) : undefined,
     distancePer100m: state.distancePer100m ? parseFloat(state.distancePer100m) : undefined,
     laps: state.laps ? parseInt(state.laps, 10) : undefined,
@@ -110,6 +112,7 @@ export function initializeFormState(workout?: Workout | null): WorkoutFormState 
       notes: workout.notes || '',
       date: workout.date,
       intervals: workout.intervals || [],
+      avgPace: workout.avgPace?.toString() || '',
       avgSpeed: workout.avgSpeed?.toString() || '',
       distancePer100m: workout.distancePer100m?.toString() || '',
       laps: workout.laps?.toString() || '',
@@ -130,6 +133,7 @@ export function initializeFormState(workout?: Workout | null): WorkoutFormState 
     notes: '',
     date: today,
     intervals: [],
+    avgPace: '',
     avgSpeed: '',
     distancePer100m: '',
     laps: '',
