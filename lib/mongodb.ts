@@ -1,4 +1,4 @@
-import { type Db, MongoClient } from 'mongodb';
+import { type Db, MongoClient, ServerApiVersion } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 const DB_NAME = process.env.MONGODB_DB_NAME || 'lets-vamos';
@@ -6,6 +6,16 @@ const DB_NAME = process.env.MONGODB_DB_NAME || 'lets-vamos';
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
 }
+
+/**
+ * Connection options to avoid SSL/TLS handshake failures (e.g. ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR)
+ * in serverless and some Node runtimes. autoSelectFamily: false forces IPv4 and prevents
+ * the TLS alert that can occur when the driver's IP family selection conflicts with Atlas.
+ */
+const clientOptions = {
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+  autoSelectFamily: false,
+};
 
 /**
  * Global is used here to maintain a cached connection across hot reloads
@@ -23,14 +33,14 @@ if (process.env.NODE_ENV === 'development') {
   // In development mode, use a global variable so that the value
   // is preserved across module reloads caused by HMR (Hot Module Replacement).
   if (!global._mongoClient) {
-    client = new MongoClient(MONGODB_URI);
+    client = new MongoClient(MONGODB_URI, clientOptions);
     global._mongoClient = client;
   } else {
     client = global._mongoClient;
   }
 } else {
   // In production mode, it's best to not use a global variable.
-  client = new MongoClient(MONGODB_URI);
+  client = new MongoClient(MONGODB_URI, clientOptions);
 }
 
 clientPromise = client.connect();
