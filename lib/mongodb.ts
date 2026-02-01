@@ -9,12 +9,15 @@ if (!MONGODB_URI) {
 
 /**
  * Connection options to avoid SSL/TLS handshake failures (e.g. ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR)
- * in serverless and some Node runtimes. autoSelectFamily: false forces IPv4 and prevents
- * the TLS alert that can occur when the driver's IP family selection conflicts with Atlas.
+ * in serverless and some Node runtimes:
+ * - autoSelectFamily: false + family: 4 — avoid IP family selection issues that can trigger TLS alerts
+ * - secureProtocol: 'TLSv1_2_method' — force TLS 1.2 only (Atlas requires modern TLS; older protocols can cause alert 80)
  */
 const clientOptions = {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
   autoSelectFamily: false,
+  family: 4,
+  secureProtocol: 'TLSv1_2_method',
 };
 
 /**
